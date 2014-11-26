@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+if [ $# != 1 ]; then
+  echo "Usage: $(basename $0) local-path-to-sortingdesk-checkout" >&2
+  exit 1
+fi
+
+sdrepo="$1"
+
+dest="./dossier/web/static/v1/deps/"
+cp "$sdrepo/src/SortingQueue/css/SortingQueue.css" "$dest"
+cp "$sdrepo/src/SortingQueue/SortingQueue.js" "$dest"
+cp "$sdrepo/dossier.js/Dossier.js" "$dest"
+

@@ -1,0 +1,9 @@
+.*.swp
+RELEASE-VERSION
+*egg-info
+postgres.yaml
+log
+test.log
+play.py
+tags
+*.pyc

@@ -1,0 +1,115 @@
+/** SortingQueue.css --- Default theme used by the Sorting Queue component
+ *
+ * Copyright (C) 2014 Diffeo
+ *
+ * Author: Diffeo <support@diffeo.com>
+ *
+ * Comments:
+ *
+ *
+ */
+
+/*csslint adjoining-classes: false, important: false */
+
+
+/* Bin */
+.sd-bin {
+  position: relative;
+  border: 2px solid #7582C9;
+  text-align: center;
+}
+
+.sd-bin .sd-bin {
+  margin: 10px;
+}
+
+.sd-bin:active:not(.sd-adding),
+.sd-bin.sd-assign {
+  position: relative;
+  top: 3px;
+  left: 3px;
+}
+
+/* Bin: common */
+.sd-bin {
+  margin: 10px 0 10px 0;
+  text-align: center;
+}
+
+.sd-bin {
+  word-wrap: break-word;
+}
+
+/* Bin: shortcut */
+.sd-bin-shortcut {
+  float: right;
+  border: 1px solid silver;
+}
+
+.sd-bin .sd-bin-shortcut {
+  border-color: #7582C9;
+}
+
+/* Text item */
+.sd-text-item {
+  margin: 15px 5px;
+  padding: 10px;
+  border: 2px solid #E0E2B6;
+}
+
+.sd-text-item.sd-selected {
+  border: 2px solid black;
+}
+
+.sd-text-item-content * {
+  display: inline-block;
+}
+
+.sd-more, .sd-less {
+  float: right;
+  font-size: 85%;
+}
+
+.sd-text-item-close {
+  float: right;
+}
+
+/* Droppable elements */
+.sd-droppable {
+  border-style: dashed;
+}
+
+.sd-droppable-highlight {
+  border-style: dashed !important;
+}
+
+.sd-droppable-hover {
+  border-style: dotted !important;
+}
+
+
+/* Button: add */
+.sd-button-add {
+  border: 2px solid;
+  padding: 5px;
+  margin: 15px auto 0 auto;
+  line-height: 25px;
+  width: 26px;
+  text-align: center;
+}
+
+/* Button: dismiss */
+.sd-button-dismiss {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  margin-top: -29px;
+  margin-left: -29px;
+  border: 2px solid #C5A2A2;
+  clear: both;
+  padding: 15px 6px 15px 6px;
+  width: 40px;
+  text-align: center;
+  background-color: white;
+  display: none;
+}
