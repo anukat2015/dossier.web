@@ -9,9 +9,11 @@ var _DossierJS = function(window, $) {
     // Create a new Dossier API, which can be used to issue requests
     // against a running instance of dossier.web.
     //
-    // `url` is the URL prefix of the dossier.web instance. If an API end
-    // point is at `http://example.com/a/b/c/dossier/v1/search_engines,
-    // then `url` should be `http://example.com/a/b/c` with NO trailing slash.
+    // `url_prefix` is an optional URL prefix of the
+    // dossier.web instance. If an API end point is at
+    // `http://example.com/a/b/c/dossier/v1/search_engines, then `url_prefix`
+    // should be `http://example.com/a/b/c` with NO trailing slash.
+    // If `url_prefix` is omitted, then `/` is used as the API.
     //
     // `api_versions` is an optional object that maps web services to integer
     // version numbers. By default, this is set to `{dossier: N}` where
@@ -19,7 +21,7 @@ var _DossierJS = function(window, $) {
     var API = function(url_prefix, api_versions) {
         this.api_versions = $.extend(true, {}, API_VERSION,
                                      api_versions || {});
-        this.prefix = url_prefix;
+        this.prefix = url_prefix || '';
     };
 
     // Constructs a URL given a service (e.g., `dossier` or `streamcorpus`),
