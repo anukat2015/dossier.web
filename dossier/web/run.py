@@ -148,7 +148,7 @@ def run_with_argv(args, app):
         gevent.monkey.patch_all()
 
     app.run(server=args.server, host=args.host, port=args.port,
-            debug=args.debug, reloader=args.reload)
+            debug=args.bottle_debug, reloader=args.reload)
 
 
 def main():
