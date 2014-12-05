@@ -195,7 +195,8 @@ def v1_random_fc_get(response, store):
 
 
 @app.put('/dossier/v1/label/<cid1>/<cid2>/<annotator_id>')
-def v1_label_put(request, response, label_store, cid1, cid2, annotator_id):
+def v1_label_put(request, response, config, label_hooks,
+                 label_store, cid1, cid2, annotator_id):
     '''Store a single label.
 
     The route for this endpoint is:
@@ -211,12 +212,21 @@ def v1_label_put(request, response, label_store, cid1, cid2, annotator_id):
     This endpoint returns status ``201`` upon successful storage.
     Any existing labels with the given ids are overwritten.
 
+    After the label is stored, any label hooks passed via ``label_hooks``
+    are executed.
+
     Currently, there is no way to *retrieve* labels through the
     API.
     '''
     coref_value = CorefValue(int(request.body.read()))
     lab = Label(cid1, cid2, annotator_id, coref_value)
     label_store.put(lab)
+
+    # Run our hooks
+    for label_hook_configurable in label_hooks:
+        label_hook = config.create(label_hook_configurable)
+        label_hook(lab)
+
     response.status = 201
 
 

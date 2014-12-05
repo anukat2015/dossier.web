@@ -27,7 +27,8 @@ from dossier.web import search_engines as builtin_engines
 
 
 def get_application(routes=None, search_engines=None,
-                    filter_preds=None, more_configurables=None):
+                    filter_preds=None, more_configurables=None,
+                    label_hooks=None):
     '''Build and return a Bottle WSGI compatible application.
 
     The application returned is a ``Bottle`` app, which means you run it
@@ -51,6 +52,7 @@ def get_application(routes=None, search_engines=None,
     '''
     routes = routes or []
     more_configurables = more_configurables or []
+    label_hooks = label_hooks or []
 
     p = argparse.ArgumentParser(
         description='Run DossierStack web services.')
@@ -79,7 +81,7 @@ def get_application(routes=None, search_engines=None,
                 pass
         sys.exit(0)
 
-    configure_app(web_conf, search_engines, filter_preds)
+    configure_app(web_conf, search_engines, filter_preds, label_hooks)
 
     for add_routes in routes:
         add_routes(app)
@@ -93,7 +95,8 @@ def get_application(routes=None, search_engines=None,
 
 
 # note that `app` is global from dossier.web.routes
-def configure_app(web_conf=None, search_engines=None, filter_preds=None):
+def configure_app(web_conf=None, search_engines=None,
+                  filter_preds=None, label_hooks=None):
     if web_conf is None:
         web_conf = config.Config()
     search_engines = search_engines or {
@@ -113,6 +116,8 @@ def configure_app(web_conf=None, search_engines=None, filter_preds=None):
         config.create_injector('label_store', lambda: web_conf.label_store))
     app.install(
         config.create_injector('search_engines', lambda: search_engines))
+    app.install(
+        config.create_injector('label_hooks', lambda: label_hooks))
     app.install(
         config.create_injector('filter_preds', lambda: filter_preds))
     app.install(
