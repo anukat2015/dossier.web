@@ -27,7 +27,7 @@ import os.path as path
 
 import bottle
 
-from dossier.fc import FeatureCollection
+from dossier.fc import FeatureCollection, StringCounter
 from dossier.label import Label, CorefValue
 from dossier.web.search_engines import streaming_sample
 
@@ -112,7 +112,7 @@ def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
         result = info
         result['content_id'] = cid
         if not omit_fc:
-            result['fc'] = fc.to_dict()
+            result['fc'] = fc_to_json(fc)
         transformed.append(result)
     results['results'] = transformed
     return results
@@ -147,7 +147,7 @@ def v1_fc_get(store, cid):
     fc = store.get(cid)
     if fc is None:
         bottle.abort(404, 'Feature collection "%s" does not exist.' % cid)
-    return fc.to_dict()
+    return fc_to_json(fc)
 
 
 @app.put('/dossier/v1/feature-collection/<cid>')
@@ -191,7 +191,7 @@ def v1_random_fc_get(response, store):
     sample = streaming_sample(store.scan_ids(), 1, 1000)
     if len(sample) == 0:
         bottle.abort(404, 'The feature collection store is empty.')
-    return [sample[0], store.get(sample[0]).to_dict()]
+    return [sample[0], fc_to_json(store.get(sample[0]))]
 
 
 @app.put('/dossier/v1/label/<cid1>/<cid2>/<annotator_id>')
@@ -235,3 +235,11 @@ def str_to_max_int(s, maximum):
         return min(maximum, int(s))
     except (ValueError, TypeError):
         return maximum
+
+
+def fc_to_json(fc):
+    d = {}
+    for name, feat in fc.iteritems():
+        if isinstance(feat, (unicode, StringCounter)):
+            d[name] = feat
+    return d
