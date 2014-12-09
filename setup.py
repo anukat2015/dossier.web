@@ -42,7 +42,7 @@ setup(
         'dblogger',
         'dossier.fc >= 0.2.0',
         'dossier.label >= 0.1.4',
-        'dossier.store >= 0.2.4',
+        'dossier.store >= 0.3.1',
         'kvlayer >= 0.4.14',
         'pytest',
         'uwsgi >= 2',
