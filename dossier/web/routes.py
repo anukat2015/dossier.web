@@ -78,22 +78,20 @@ def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
     except KeyError as e:
         bottle.abort(404,
             'Search engine "%s" does not exist.' % e.message)
+
+    filter_names = request.query.getall('filter') or ['already_labeled']
+    request.query.pop('filter', None)  # remove from query dict
     try:
-        fil_name = request.query.pop('filter', 'already_labeled')
-        init_filter_pred = None
-        if len(fil_name) > 0:
-            init_filter_pred = filter_preds[fil_name]
+        init_filter_preds = [filter_preds[n] for n in filter_names]
     except KeyError as e:
         bottle.abort(404,
             'Rank filter "%s" does not exist.' % e.message)
     search_engine = config.create(search_engine)
 
-    filter_pred = None
-    if init_filter_pred is not None:
-        init_filter_pred = config.create(init_filter_pred)
-        filter_pred = init_filter_pred(cid)
-    else:
-        filter_pred = lambda _: True
+    filter_pred = lambda _: True
+    if len(init_filter_preds) > 0:
+        preds = map(lambda p: config.create(p)(cid), init_filter_preds)
+        filter_pred = lambda (cid, fc): all(p((cid, fc)) for p in preds)
 
     kwargs = dict(request.query)
     kwargs['filter_pred'] = filter_pred
