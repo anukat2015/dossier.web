@@ -40,7 +40,7 @@ setup(
     install_requires=[
         'bottle >= 0.12',
         'dblogger',
-        'dossier.fc >= 0.1.4',
+        'dossier.fc >= 0.2.0',
         'dossier.label >= 0.1.4',
         'dossier.store >= 0.2.4',
         'kvlayer >= 0.4.14',
