@@ -43,6 +43,7 @@ def plain_index_scan(store):
     def streaming_ids(content_id):
         query_fc = store.get(content_id)
         if query_fc is None:
+            logger.info('Could not find FC for "%s"', content_id)
             return
 
         blacklist = {content_id}
