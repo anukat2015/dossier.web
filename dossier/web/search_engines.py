@@ -27,8 +27,9 @@ def random(store):
         cids = []
         for name in fc.get(u'NAME'):
             cids.extend(store.index_scan(u'NAME', name))
-        results = list(ifilter(lambda (cid, fc): fc is not None,
-                               store.get_many(cids)))
+        results = list(ifilter(
+            lambda (cid, fc): fc is not None and filter_pred((cid, fc)),
+            store.get_many(cids)))
         rand.shuffle(results)
         return {'results': results[0:limit]}
     return _
