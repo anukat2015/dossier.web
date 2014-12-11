@@ -95,7 +95,7 @@ def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
 
     kwargs = dict(request.query)
     kwargs['filter_pred'] = filter_pred
-    kwargs['limit'] = str_to_max_int(request.query.get('limit'), 20)
+    kwargs['limit'] = str_to_max_int(request.query.get('limit'), 100)
 
     results = search_engine(cid, **kwargs)
     transformed = []
