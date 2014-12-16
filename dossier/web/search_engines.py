@@ -50,7 +50,7 @@ def plain_index_scan(store):
         blacklist = {content_id}
         cids = set()
         for idx_name in store.index_names():
-            for name in query_fc.get(idx_name):
+            for name in query_fc.get(idx_name, {}):
                 logger.info('index scanning for "%s" (content id: %s)',
                             name, content_id)
                 for cid in store.index_scan(idx_name, name):
