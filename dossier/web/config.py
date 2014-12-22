@@ -193,5 +193,5 @@ class JsonPlugin(object):
             return callback
         def _(*args, **kwargs):
             bottle.response.content_type = 'application/json'
-            return json.dumps(callback(*args, **kwargs))
+            return json.dumps(callback(*args, **kwargs), indent=2)
         return _
