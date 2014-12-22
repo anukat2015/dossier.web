@@ -1,3 +1,15 @@
+/** Dossier.js --- Diffeo's dossier.web API
+ *
+ * Copyright (C) 2014 Diffeo
+ *
+ * Author: Andrew Gallant <andrew@diffeo.com>
+ *
+ * Comments:
+ *
+ *
+ */
+
+
 var _DossierJS = function(window, $) {
     var API_VERSION = {
         dossier: 1,
@@ -173,7 +185,7 @@ var _DossierJS = function(window, $) {
             type: 'PUT',
             url: this.url(endpoint),
             contentType: 'text/plain',
-            data: coref_value.toString(),
+            data: coref_value.toString()
         }).fail(function() {
             var label = [cid1.toString(), cid2.toString(),
                          annotator.toString(), coref_value.toString()];
@@ -196,11 +208,14 @@ var _DossierJS = function(window, $) {
         this.raw = obj || {};
     };
 
-    // Returns the feature corresponding to the given name.
+    // Returns the feature corresponding to the given name. This will
+    // check for and prefer a "display" version of the feature and return
+    // that instead.
     //
-    // Equivalent to `fc.raw[name] || null`.
+    // Equivalent to `fc.raw['#' + name] || fc.raw[name] || null`.
     FeatureCollection.prototype.feature = function(name) {
-        return this.raw[name] || null;
+        var display_name = '#' + name;
+        return this.raw[display_name] || this.raw[name] || null;
     };
 
     // Arbitrarily return the value of a named feature. (e.g., A Unicode
@@ -213,9 +228,25 @@ var _DossierJS = function(window, $) {
         if (typeof feat === 'string') {
             return feat;
         } else {
-            for (var k in this.feature(name)) { return k; }
+            for (var k in feat) { return k; }
             return null;
         }
+    };
+
+    // This is just like the `value` method, except it returns an array
+    // of all values. If the feature is empty or non-existent, an empty
+    // array is returned;
+    FeatureCollection.prototype.values = function(name) {
+        var vals = [],
+            feat = this.feature(name);
+        if (typeof feat === 'string') {
+            return [feat];
+        } else {
+            for (var k in feat) {
+                vals.push(k);
+            }
+        }
+        return vals;
     }
 
     // SortingQueueItems provides SortingQueue integration with DossierJS.
@@ -230,7 +261,7 @@ var _DossierJS = function(window, $) {
     // instance of `SortingQueue` with the appropriate callbacks. e.g.,
     //
     //   var qitems = new SortingQueueItems(...);
-    //   new SortingQueue.Instance(
+    //   new SortingQueue.Sorter(
     //     config, $.extend(qitems.callbacks(), yourCallbacks));
     //
     // The query and search engine can be changed by modifying the contents
@@ -248,8 +279,8 @@ var _DossierJS = function(window, $) {
     // to the value given in the constructor, but may be changed at any time.
     // The value is used whenever a label is created.
     //
-    // There is also a `limit` instance attribute, which is set to `5` by
-    // default. It can be changed at any time.
+    // There are also `limit` and `params` instance attributes. `limit` is set
+    // to `5` by default. `params` is empty by default.
     //
     // The `api` parameter should be an instance of `DossierJS.API`.
     //
@@ -262,16 +293,17 @@ var _DossierJS = function(window, $) {
         this.query_content_id = query_content_id;
         this.annotator = annotator;
         this.limit = 5;
+        this.params = {};
         this._processing = false;
     };
 
-    // Returns an object of callbacks that may be given directory to the
+    // Returns an object of callbacks that may be given directly to the
     // `SortingQueue` constructor.
     SortingQueueItems.prototype.callbacks = function() {
         return {
             itemDismissed:
                 SortingQueueItems.prototype._itemDismissed.bind(this),
-            moreTexts: SortingQueueItems.prototype._moreTexts.bind(this),
+            moreTexts: SortingQueueItems.prototype._moreTexts.bind(this)
         };
     };
 
@@ -294,25 +326,30 @@ var _DossierJS = function(window, $) {
         var self = this;
 
         if (self._processing) {
-            console.log('moreTexts in progress, ignoring new request');
-            return null;
+            var deferred = $.Deferred();
+
+            window.setTimeout(function () {
+                console.log('moreTexts in progress, ignoring new request');
+                deferred.reject( { error: "Request in progress" } );
+            } );
+
+            return deferred.promise();
         }
+
         self._processing = true;
 
-        var p = {limit: self.limit.toString()};
+        var p = $.extend({limit: self.limit.toString()}, self.params);
         return self.api.search(self.engine_name, self.query_content_id, p)
             .then(function(data) {
                 var items = [];
                 data.results.forEach(function(cobj) {
-                    items.push({
-                        content_id: cobj.content_id,
-                        fc: cobj.fc,
+                    items.push($.extend(cobj, {
                         node_id: cobj.content_id,
                         name: cobj.fc.value('NAME') || '',
                         text: cobj.fc.value('sentences')
                               || (cobj.fc.value('NAME') + ' (profile)'),
-                        url: cobj.fc.value('abs_url'),
-                    });
+                        url: cobj.fc.value('abs_url')
+                    }));
                 });
                 return items;
             })
@@ -338,7 +375,7 @@ var _DossierJS = function(window, $) {
         // classes
         API: API,
         FeatureCollection: FeatureCollection,
-        SortingQueueItems: SortingQueueItems,
+        SortingQueueItems: SortingQueueItems
     };
 };
 
@@ -349,3 +386,11 @@ if(typeof define === "function" && define.amd) {
 } else {
     var DossierJS = _DossierJS(window, $);
 }
+
+
+/*  Emacs settings     */
+/* ------------------- */
+/* Local Variables:    */
+/* js2-basic-offset: 4 */
+/* End:                */
+/* ------------------- */

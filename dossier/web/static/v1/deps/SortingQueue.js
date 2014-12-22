@@ -2,7 +2,7 @@
  * @file Sorting Queue component.
  * @copyright 2014 Diffeo
  *
- * @author Diffeo <support@diffeo.com>
+ * @author Miguel Guedes <miguel@miguelguedes.org>
  *
  * Comments:
  *
@@ -22,7 +22,7 @@
 var SortingQueue_ = function (window, $) {
 
   /**
-   * @class@
+   * @class
    * */
   /**
    * Constructor responsible for initialising Sorting Queue.
@@ -31,11 +31,9 @@ var SortingQueue_ = function (window, $) {
    *                            `defaults_' above)
    * @param   {Object}    cbs   Map of all callbacks
    *
-   * @param   cbs.moreText            Retrieve additional text items.
+   * @param   cbs.moreTexts           Retrieve additional text items.
    * @param   cbs.itemDismissed       Event triggered when a text item is
    *                                  dismissed.
-   * @param   cbs.itemDroppedInBin    Event triggered when a text item is
-   *                                  assigned to a bin.
    * @param   cbs.itemSelected        Event triggered when a text item is
    *                                  selected.
    * @param   cbs.itemDeselected      Event triggered when a text item is
@@ -43,7 +41,7 @@ var SortingQueue_ = function (window, $) {
    * @param   cbs.onRequestStart      Executed after request initiated.
    * @param   cbs.onRequestStop       Executed after request finished.
    * */
-  var Instance = function (opts, cbs)
+  var Sorter = function (opts, cbs)
   {
     this.resetter_ = false;
 
@@ -79,26 +77,23 @@ var SortingQueue_ = function (window, $) {
 
     this.options_ = $.extend(true, $.extend(true, {}, defaults_), opts);
 
-    /* TODO: the following callbacks need to be turned into events that clients
-     * can subscribe to one or more times. */
-    this.callbacks_ = $.extend({
+    /* Begin instantiating and initialising controllers. */
+    (this.callbacks_ = new ControllerCallbacks(
+      this,
+      $.extend(true, {
         itemDismissed: function() {},
-        itemDroppedInBin: function() {},
         itemSelected: function() {},
         itemDeselected: function() {},
         onRequestStart: function() {},
         onRequestStop: function() {}
-    }, cbs);
-
-    /* Begin instantiating and initialising controllers. */
-    (this.callbacks_ = new ControllerCallbacks(this, this.callbacks_))
-      .initialise();
+      }, cbs)))
+        .initialise();
 
     (this.requests_ = new ControllerRequests(this))
       .initialise();
   };
 
-  Instance.prototype = {
+  Sorter.prototype = {
     initialised_: false,
     resetter_: false,
     options_: null,
@@ -123,11 +118,10 @@ var SortingQueue_ = function (window, $) {
         .initialise();
 
       this.dismiss_.register('text-item', function (e, id, scope) {
-        var item = self.items.getById(id);
+        var item = self.items.getById(decodeURIComponent(id));
 
-        self.callbacks.invoke("itemDismissed", item);
-        self.items.remove(
-          self.items.getById(decodeURIComponent(id)));
+        self.callbacks.invoke("itemDismissed", item.content);
+        self.items.remove(item);
       } );
 
       (this.items_ = new ControllerItems(this))
@@ -221,7 +215,7 @@ var SortingQueue_ = function (window, $) {
 
       /* Factory method doesn't exist. Ensure class constructor has been passed
        * and instantiate it. */
-      if(!(arguments[0] in this.options_.constructors))
+      if(!this.options_.constructors.hasOwnProperty(arguments[0]))
         throw "Class or factory non existent: " + arguments[0];
 
       descriptor = this.options_.constructors[arguments[0]];
@@ -246,7 +240,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var InstanceResetter = function (instance)
   {
@@ -332,7 +326,7 @@ var SortingQueue_ = function (window, $) {
           }
 
           /* Special measure for instances that return a promise. */
-          if(result && 'always' in result) {
+          if(result && result.hasOwnProperty('always')) {
             ++waiting;
 
             /* Wait until it finishes. The assumption is made that instances
@@ -351,7 +345,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var /* abstract */ Owned = function (owner)
   {
@@ -365,7 +359,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var /* abstract */ Controller = function (owner)
   {
@@ -384,7 +378,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var /* abstract */ Drawable = function (owner)
   {
@@ -399,7 +393,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var ControllerCallbacks = function (owner, callbacks)
   {
@@ -416,13 +410,13 @@ var SortingQueue_ = function (window, $) {
   ControllerCallbacks.prototype.reset = function () { };
 
   ControllerCallbacks.prototype.exists = function (callback)
-  { return callback in this.callbacks_; };
+  { return this.callbacks_.hasOwnProperty(callback); };
 
   ControllerCallbacks.prototype.invoke = function ()
   {
     var result = this.call_.apply(this, arguments);
 
-    if(result && 'always' in result) {
+    if(result && result.hasOwnProperty('always')) {
       var self = this;
 
       this.owner_.requests.begin(result);
@@ -444,7 +438,7 @@ var SortingQueue_ = function (window, $) {
   {
     if(arguments.length < 1)
       throw "Callback name required";
-    else if(!(arguments[0] in this.callbacks_))
+    else if(!this.callbacks_.hasOwnProperty(arguments[0]))
       throw "Callback non existent: " + arguments[0];
 
     return this.callbacks_[arguments[0]]
@@ -453,7 +447,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var ControllerRequests = function (owner)
   {
@@ -505,7 +499,7 @@ var SortingQueue_ = function (window, $) {
 
   ControllerRequests.prototype.end = function (id)
   {
-    if(id in this.requests_) {
+    if(this.requests_.hasOwnProperty(id)) {
       /* Delete request from internal collection if last one, otherwise
        * decrement reference count. */
       if(this.requests_[id] == 1)
@@ -591,7 +585,7 @@ var SortingQueue_ = function (window, $) {
       } );
 
       this.owner_.callbacks.invoke("itemDismissed",
-                                   this.owner_.items.selected());
+                                   this.owner_.items.selected().content);
       this.owner_.items.remove();
 
       break;
@@ -605,7 +599,7 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var ControllerButtonDismiss = function (owner)
   {
@@ -630,7 +624,7 @@ var SortingQueue_ = function (window, $) {
       scopes: [ ],
 
       drop: function (e, id, scope) {
-        if(scope in self.handlers_) {
+        if(self.handlers_.hasOwnProperty(scope)) {
           self.handlers_[scope](e, id, scope);
         } else {
           console.log("Warning: unknown scope: " + scope);
@@ -648,7 +642,7 @@ var SortingQueue_ = function (window, $) {
   {
     if(!this.droppable_)
       return;
-    if(!(scope in this.handlers_))
+    else if(!this.handlers_.hasOwnProperty(scope))
       this.droppable_.addScope(scope);
 
     this.handlers_[scope] = fnHandler;
@@ -691,6 +685,9 @@ var SortingQueue_ = function (window, $) {
     this.node_ = this.owner_.options.nodes.items;
     this.items_ = [ ];
     this.fnDisableEvent_ = function (e) { return false; };
+
+    /* Define getters. */
+    this.__defineGetter__("items", function () { return this.items_; } );
   };
 
   ControllerItems.prototype = Object.create(Controller.prototype);
@@ -723,106 +720,60 @@ var SortingQueue_ = function (window, $) {
     this.check();
   };
 
+  // Returns a de-duped `items`.
+  // This includes de-duping with respect to items currently in the queue.
+  ControllerItems.prototype.dedupItems = function(items) {
+    var seen = {},
+        deduped = [];
+    for (var i = 0; i < this.items.length; i++) {
+      seen[this.items[i].content.node_id] = true;
+    }
+    for (var i = 0; i < items.length; i++) {
+      var id = items[i].node_id;
+      if (!seen[id]) {
+        seen[id] = true;
+        deduped.push(items[i]);
+      }
+    }
+    return deduped;
+  };
+
   ControllerItems.prototype.check = function ()
   {
     if(this.items_.length >= this.owner_.options.visibleItems)
       return;
 
-    var self = this,
-        promise = this.owner_.callbacks.invoke(
-          "moreTexts",
-          this.owner_.options.visibleItems);
+    var self = this;
 
-    promise.done(function (items) {
-      self.owner_.requests.begin('check-items');
+    this.owner_.callbacks.invoke("moreTexts",
+                                 this.owner_.options.visibleItems)
+      .done(function (items) {
+        self.owner_.requests.begin('check-items');
 
-      items.forEach(function (item, index) {
-        window.setTimeout( function () {
-          self.items_.push(self.owner_.instantiate('Item', self, item));
-        }, Math.pow(index, 2) * 1.1);
+        /* Ensure we've received a valid items array. */
+        if(items && items instanceof Array && items.length) {
+          items = self.dedupItems(items);
+          items.forEach(function (item, index) {
+            window.setTimeout( function () {
+              self.items_.push(self.owner_.instantiate('Item', self, item));
+            }, Math.pow(index, 2) * 1.1);
+          } );
+
+          window.setTimeout( function () {
+            self.select();
+          }, 10);
+
+          /* Ensure event is fired after the last item is added. */
+          window.setTimeout( function () {
+            self.owner_.requests.end('check-items');
+          }, Math.pow(items.length - 1, 2) * 1.1 + 10);
+        } else
+          self.owner_.requests.end('check-items');
       } );
-
-      window.setTimeout( function () {
-        self.select();
-      }, 10);
-
-      /* Ensure event is fired after the last item is added. */
-      window.setTimeout( function () {
-        self.owner_.requests.end('check-items');
-      }, Math.pow(items.length - 1, 2) * 1.1 + 10);
-    } );
   };
 
   ControllerItems.prototype.select = function (variant)
-  {
-    /* Fail silently if not initialised anymore. This might happen if, for
-     * example, the `reset' method was invoked but the component is still
-     * loading text items. */
-    if(!this.owner_.initialised)
-      return;
-
-    var csel = this.owner_.options.css.itemSelected;
-
-    if(!this.node_.children().length)
-      return;
-
-    if(typeof variant == 'undefined') {
-      variant = this.node_.find('.' + csel);
-
-      if(variant.length == 0)
-        variant = this.node_.children().eq(0);
-      else if(variant.length > 1) {
-        /* We should never reach here. */
-        console.log("WARNING! Multiple text items selected:", variant.length);
-
-        variant = variant.eq(0);
-      }
-    } else if(typeof variant == 'number') {
-      if(variant < 0)
-        variant = 0;
-      else if(variant > this.node_.children().length - 1)
-        variant = this.node_.children().length - 1;
-
-      variant = this.node_.children().eq(variant);
-    } else if(variant instanceof Item)
-      variant = variant.node;
-
-    /* Select next item (if any), making sure currently active item (if any) is
-     * deselected. */
-    var current = this.getNodeSelected(),
-        next = this.getByNode(variant);
-
-    if(current.length)
-      this.getByNode(current).deselect();
-
-    if(next)
-      next.select();
-
-    /* WARNING: the present implementation requires knowledge of the list
-     * items' container's height or it will fail to ensure the currently
-     * selected item is always visible.
-     *
-     * A particular CSS style involving specifying the container's height
-     * using `vh' units was found to break this behaviour.
-     */
-
-    /* Ensure text item is _always_ visible at the bottom and top ends of
-     * the containing node. */
-    var st = this.node_.scrollTop(),           /* scrolling top */
-        ch = this.node_.innerHeight(),         /* container height */
-        ipt = variant.position().top,          /* item position top */
-        ih = st + ipt + variant.outerHeight(); /* item height */
-
-    if(st + ipt < st            /* top */
-       || variant.outerHeight() > ch) {
-      this.node_.scrollTop(st + ipt);
-    } else if(ih > st + ch) {   /* bottom */
-      this.node_.scrollTop(st + ipt - ch
-                           + variant.outerHeight()
-                           + parseInt(variant.css('marginBottom'))
-                           + parseInt(variant.css('paddingBottom')));
-    }
-  };
+  { this.select_(variant); };
 
   ControllerItems.prototype.selectOffset = function (offset)
   {
@@ -940,6 +891,79 @@ var SortingQueue_ = function (window, $) {
     return this.node_.find('.' + this.owner_.options.css.itemSelected);
   };
 
+  /* Private methods */
+  ControllerItems.prototype.select_ = function (variant,
+                                                /* optional */ ev)
+  {
+    /* Fail silently if not initialised anymore. This might happen if, for
+     * example, the `reset' method was invoked but the component is still
+     * loading text items. */
+    if(!this.owner_.initialised)
+      return;
+
+    var csel = this.owner_.options.css.itemSelected;
+
+    if(!this.node_.children().length)
+      return;
+
+    if(typeof variant == 'undefined') {
+      variant = this.node_.find('.' + csel);
+
+      if(variant.length == 0)
+        variant = this.node_.children().eq(0);
+      else if(variant.length > 1) {
+        /* We should never reach here. */
+        console.log("WARNING! Multiple text items selected:", variant.length);
+
+        variant = variant.eq(0);
+      }
+    } else if(typeof variant == 'number') {
+      if(variant < 0)
+        variant = 0;
+      else if(variant > this.node_.children().length - 1)
+        variant = this.node_.children().length - 1;
+
+      variant = this.node_.children().eq(variant);
+    } else if(variant instanceof Item)
+      variant = variant.node;
+
+    /* Select next item (if any), making sure currently active item (if any) is
+     * deselected. */
+    var current = this.getNodeSelected(),
+        next = this.getByNode(variant);
+
+    if(current.length)
+      this.getByNode(current).deselect();
+
+    if(next)
+      next.select_(ev);
+
+    /* WARNING: the present implementation requires knowledge of the list
+     * items' container's height or it will fail to ensure the currently
+     * selected item is always visible.
+     *
+     * A particular CSS style involving specifying the container's height
+     * using `vh' units was found to break this behaviour.
+     */
+
+    /* Ensure text item is _always_ visible at the bottom and top ends of
+     * the containing node. */
+    var st = this.node_.scrollTop(),           /* scrolling top */
+        ch = this.node_.innerHeight(),         /* container height */
+        ipt = variant.position().top,          /* item position top */
+        ih = st + ipt + variant.outerHeight(); /* item height */
+
+    if(st + ipt < st            /* top */
+       || variant.outerHeight() > ch) {
+      this.node_.scrollTop(st + ipt);
+    } else if(ih > st + ch) {   /* bottom */
+      this.node_.scrollTop(st + ipt - ch
+                           + variant.outerHeight()
+                           + parseInt(variant.css('marginBottom'))
+                           + parseInt(variant.css('paddingBottom')));
+    }
+  };
+
 
   /**
    * @class
@@ -980,8 +1004,8 @@ var SortingQueue_ = function (window, $) {
         id: encodeURIComponent(this.content_.node_id),
         "data-scope": "text-item"
       } )
-      .click(function () {
-        self.owner_.select(self);
+      .click(function (ev) {
+        self.owner_.select_(self, ev);
       } );
 
     this.getNodeClose()
@@ -990,6 +1014,10 @@ var SortingQueue_ = function (window, $) {
         self.owner_.remove(self);
         return false;
       } );
+
+    /* Do not set up drag and drop on the item if not supposed to. */
+    if(!parentOwner.options.itemsDraggable)
+      return;
 
     new Draggable(this.node_, {
       classDragging: parentOwner.options.css.itemDragging,
@@ -1018,30 +1046,28 @@ var SortingQueue_ = function (window, $) {
       this.owner_.select(this);
   };
 
-  Item.prototype.select = function() {
-    this.node.addClass(this.owner.owner.options.css.itemSelected);
-    this.owner.owner.callbacks.invoke("itemSelected", this.content);
-  };
-
   Item.prototype.deselect = function() {
-    this.node.removeClass(this.owner.owner.options.css.itemSelected);
-    this.owner.owner.callbacks.invoke("itemDeselected", this.content);
+    this.node.removeClass(this.owner_.owner.options.css.itemSelected);
+    this.owner_.owner.callbacks.invoke("itemDeselected", this.content);
   };
 
   Item.prototype.render = function() {
-    var node = $('<div class="sd-text-item"/>'),
-        content = $('<div class="sd-text-item-content"/>'),
+    var css = this.owner_.owner.options.css,
+        node = $('<div class="' + css.item + '"/>'),
+        content = $('<div class="' + css.itemContent + '"/>'),
         anchor = this.content_.name;
 
     /* Append title if existent. */
-    if (this.content_.title) {
+    if (this.content_.title)
       anchor += '&ndash; ' + this.content_.title;
+
+    if(this.content_.url && anchor) {
+      node.append('<a class="' + css.itemTitle + '" target="_blank" '
+                  + 'href="' + this.content_.url + '">'
+                  + anchor + '</a>');
     }
 
-    node.append('<a class="sd-text-item-title" target="_blank" '
-                + 'href="' + this.content_.url + '">'
-                + anchor + '</a>');
-    node.append('<a class="sd-text-item-close" href="#">x</a>');
+    node.append('<a class="' + css.itemClose + '" href="#">x</a>');
 
     /* Append content and remove all CSS classes from children. */
     content.append(this.content_.text);
@@ -1053,55 +1079,77 @@ var SortingQueue_ = function (window, $) {
   /* Not mandatory. */
   /* overridable */
   Item.prototype.getNodeClose = function() {
-    return this.node_.find('.sd-text-item-close');
+    return this.node_.find('.' + this.owner_.owner.options.css.itemClose);
   };
 
   /* overridable */ Item.prototype.isSelected = function ()
   { return this.node_.hasClass(this.owner_.owner.options.css.itemSelected); };
 
+  /* Private methods */
+  Item.prototype.select_ = function (ev) {
+    this.node.addClass(this.owner_.owner.options.css.itemSelected);
+    this.owner_.owner.callbacks.invoke("itemSelected", this.content, ev);
+  };
+
 
   /**
-   * @class@
+   * @class
    *
    * Static class.
    * */
   var DragDropManager = {
-    activeNode: null,
+    activeNode_: null,
 
     onDragStart: function (event) {
-      DragDropManager.activeNode = (event.originalEvent || event).target;
+      DragDropManager.activeNode_ = (event.originalEvent || event).target;
     },
 
     onDragEnd: function (event) {
-      if(DragDropManager.activeNode == (event.originalEvent || event).target) {
-        DragDropManager.activeNode = null;
+      if(DragDropManager.activeNode_ == (event.originalEvent || event).target) {
+        DragDropManager.activeNode_ = null;
       }
     },
 
     isScope: function (event, scopes)
     {
-      if(!DragDropManager.activeNode)
-        return false;
+      if(!scopes)
+        return true;
 
-      var currentScope = DragDropManager.activeNode.getAttribute('data-scope');
+      var isFilter = (typeof scopes === 'function');
 
-      return (scopes instanceof Array ? scopes : [ scopes ])
-        .some(function (scope) {
-          return currentScope == scope;
-        } );
+      if(!DragDropManager.activeNode_)
+        return isFilter && scopes(null);
+
+      var current = DragDropManager.activeNode_.getAttribute('data-scope');
+
+      return isFilter
+        ? scopes(current)
+        : DragDropManager.hasScope(scopes, current);
     },
 
     getScope: function (event)
     {
-      return DragDropManager.activeNode
-        ? DragDropManager.activeNode.getAttribute('data-scope')
+      return DragDropManager.activeNode_
+        ? DragDropManager.activeNode_.getAttribute('data-scope')
         : null;
-    }
+    },
+
+    hasScope: function (all, target)
+    {
+      return (all instanceof Array ? all : [ all ])
+        .some(function (s) {
+          return s === target;
+        } );
+    },
+
+    /* Private methods */
+    reset_: function ()
+    { DragDropManager.activeNode_ = null; }
   };
 
 
   /**
-   * @class@
+   * @class
    * */
   var Draggable = function (node, options)
   {
@@ -1113,7 +1161,8 @@ var SortingQueue_ = function (window, $) {
          * `originalEvent' or some tests will break. */
         e.stopPropagation();
         e = e.originalEvent;
-        e.dataTransfer.setData('Text', this.id);
+        e.dataTransfer.setData('Text', ' ');
+        e.dataTransfer.setData('DossierId', this.id);
 
         if(options.classDragging)
           node.addClass(options.classDragging);
@@ -1143,47 +1192,50 @@ var SortingQueue_ = function (window, $) {
 
 
   /**
-   * @class@
+   * @class
    * */
   var Droppable = function (node, options)
   {
     var self = this;
 
     this.options_ = options;
+    this.node_ = node;
 
     node.on( {
       dragover: function (e) {
-        if(DragDropManager.isScope(e = e.originalEvent, options.scopes)) {
-          /* Drag and drop has a tendency to suffer from flicker in the sense that
-           * the `dragleave' event is fired while the pointer is on a valid drop
-           * target but the `dragenter' event ISN'T fired again, causing the
-           * element to lose its special styling -- given by `options.classHover'
-           * -- and its `dropEffect'. We then need re-set everything in the
-           * `dragover' event. */
-          if(options.classHover)
-            node.addClass(options.classHover);
+        if(!DragDropManager.isScope(e = e.originalEvent, options.scopes))
+          return;
 
-          e.dropEffect = 'move';
-          return false;
-        }
+        /* Drag and drop has a tendency to suffer from flicker in the sense that
+         * the `dragleave' event is fired while the pointer is on a valid drop
+         * target but the `dragenter' event ISN'T fired again, causing the
+         * element to lose its special styling -- given by `options.classHover'
+         * -- and its `dropEffect'. We then need re-set everything in the
+         * `dragover' event. */
+        if(options.classHover)
+          node.addClass(options.classHover);
+
+        e.dropEffect = 'move';
+        return false;
       },
 
       dragenter: function (e) {
         /* IE requires the following special measure. */
-        if(DragDropManager.isScope(e = e.originalEvent, options.scopes)) {
-          e.dropEffect = 'move';
+        if(!DragDropManager.isScope(e = e.originalEvent, options.scopes))
+          return;
 
-          return false;
-        }
+        e.dropEffect = 'move';
+        return false;
       },
 
       dragleave: function (e) {
-        if(DragDropManager.isScope(e = e.originalEvent, options.scopes)) {
-          if(options.classHover)
-            node.removeClass(options.classHover);
+        if(!DragDropManager.isScope(e = e.originalEvent, options.scopes))
+          return;
 
-          return false;
-        }
+        if(options.classHover)
+          node.removeClass(options.classHover);
+
+        return false;
       },
 
       drop: function (e) {
@@ -1194,10 +1246,21 @@ var SortingQueue_ = function (window, $) {
           node.removeClass(options.classHover);
 
         if(options.drop) {
-          options.drop(e,
-                       e.dataTransfer.getData('Text'),
-                       DragDropManager.getScope());
+          /* The following try-catch is required to prevent the drop event from
+           * bubbling up, should an error occur inside the handler. */
+          try {
+            options.drop(
+              e,
+              e.dataTransfer && e.dataTransfer.getData('DossierId') || null,
+              DragDropManager.getScope());
+          } catch (x) {
+            console.log("Exception occurred:", x);
+          }
         }
+
+        /* Forcefully reset state as some drag and drop events don't cause the
+         * dragleave event to be fired at the end. */
+        DragDropManager.reset_();
 
         return false;
       }
@@ -1205,12 +1268,27 @@ var SortingQueue_ = function (window, $) {
   };
 
   Droppable.prototype = {
+    node_: null,
     options_: null,
 
     addScope: function (scope)
     {
-      if(!(scope in this.options_.scopes))
+      if(!this.options_.scopes)
+        this.options_.scopes = [ ];
+
+      if(!this.options_.scopes.hasOwnProperty(scope))
         this.options_.scopes.push(scope);
+    },
+
+    reset: function ()
+    {
+      /* Clear all events.
+       *
+       * Note that this may be undesirable since all the events attached to the
+       * element are cleared, including any events the client may have set
+       * up. */
+      this.node_.off();
+      this.node_ = this.options_ = null;
     }
   };
 
@@ -1232,6 +1310,10 @@ var SortingQueue_ = function (window, $) {
    */
   var defaults_ = {
     css: {
+      item: 'sd-text-item',
+      itemContent: 'sd-text-item-content',
+      itemTitle: 'sd-text-item-title',
+      itemClose: 'sd-text-item-close',
       itemSelected: 'sd-selected',
       itemDragging: 'sd-dragging'
     },
@@ -1252,7 +1334,8 @@ var SortingQueue_ = function (window, $) {
     },
     visibleItems: 20,           /* Arbitrary.           */
     binCharsLeft: 25,
-    binCharsRight: 25
+    binCharsRight: 25,
+    itemsDraggable: true
   };
 
 
@@ -1271,14 +1354,12 @@ var SortingQueue_ = function (window, $) {
     Droppable: Droppable,
 
     /* SortingQueue proper */
-    Instance: Instance,
+    Sorter: Sorter,
     Item: Item
   };
 
 };
 
-
-var SortingQueue;
 
 /* Compatibility with RequireJs. */
 if(typeof define === "function" && define.amd) {
@@ -1286,4 +1367,4 @@ if(typeof define === "function" && define.amd) {
     return SortingQueue_(window, $);
   });
 } else
-  SortingQueue = SortingQueue_(window, $);
+  window.SortingQueue = SortingQueue_(window, $);
