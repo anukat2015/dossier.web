@@ -21,9 +21,12 @@ The API end points are documented as functions in this module.
 
 '''
 from __future__ import absolute_import, division, print_function
+from itertools import imap, islice
 import json
 import logging
 import os.path as path
+import urllib
+import urlparse
 
 import bottle
 
@@ -217,7 +220,9 @@ def v1_label_put(request, response, config, label_hooks,
     API.
     '''
     coref_value = CorefValue(int(request.body.read()))
-    lab = Label(cid1, cid2, annotator_id, coref_value)
+    lab = Label(cid1, cid2, annotator_id, coref_value,
+                subtopic_id1=request.query.get('subtopic_id1'),
+                subtopic_id2=request.query.get('subtopic_id2'))
     label_store.put(lab)
 
     # Run our hooks
@@ -226,6 +231,28 @@ def v1_label_put(request, response, config, label_hooks,
         label_hook(lab)
 
     response.status = 201
+
+
+@app.get('/dossier/v1/label/<cid>/direct', json=True)
+def v1_label_direct(request, response, label_store, cid):
+    labs = imap(label_to_json, label_store.get_all_for_content_id(cid))
+    return list(paginate(request, response, labs))
+
+
+@app.get('/dossier/v1/label/<cid>/positive', json=True)
+def v1_label_positive(request, response, label_store, cid):
+    method = {
+        'connected': label_store.connected_component,
+        'expanded': label_store.expand,
+    }[request.query.get('method', 'connected')]
+    labs = imap(label_to_json, method(cid))
+    return list(paginate(request, response, labs))
+
+
+@app.get('/dossier/v1/label/<cid>/negative', json=True)
+def v1_label_negative(request, response, label_store, cid):
+    labs = imap(label_to_json, label_store.negative_inference(cid))
+    return list(paginate(request, response, labs))
 
 
 def str_to_max_int(s, maximum):
@@ -241,3 +268,46 @@ def fc_to_json(fc):
         if isinstance(feat, (unicode, StringCounter)):
             d[name] = feat
     return d
+
+
+def label_to_json(lab):
+    lab = {f: getattr(lab, f) for f in lab._fields}
+    lab['value'] = lab['value'].value
+    return lab
+
+
+def paginate(request, response, it):
+    def setqp(param, val):
+        return set_query_param(request.url, param, val)
+
+    def tuple_to_link((rel, url)):
+        return '<%s>; rel="%s"' % (url, rel)
+
+    def add_link_headers(page, per):
+        links = []
+        # Add the "first" and "prev" links.
+        if page > 1:
+            links.append(('first', setqp('page', '1')))
+            links.append(('prev', setqp('page', str(page - 1))))
+        # We never really know when the stream ends, so there is always a
+        # "next" link.
+        links.append(('next', setqp('page', str(page + 1))))
+        response.headers['Link'] = ', '.join(map(tuple_to_link, links))
+
+    page = max(1, int(request.query.get('page', 1)))
+    per = min(500, max(1, int(request.query.get('perpage', 2))))
+    start = (page - 1) * per
+    end = start + per
+    add_link_headers(page, per)
+    return islice(it, start, end)
+
+
+def set_query_param(url, param, value):
+    '''Returns a new URL with the given query parameter set to ``value``.
+
+    ``value`` may be a list.'''
+    scheme, netloc, path, qs, frag = urlparse.urlsplit(url)
+    params = urlparse.parse_qs(qs)
+    params[param] = value
+    qs = urllib.urlencode(params, doseq=True)
+    return urlparse.urlunsplit((scheme, netloc, path, qs, frag))
