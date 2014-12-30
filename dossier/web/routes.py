@@ -135,7 +135,7 @@ def v1_search_engines(search_engines):
     return sorted(search_engines.keys())
 
 
-@app.get('/dossier/v1/feature-collection/<cid>')
+@app.get('/dossier/v1/feature-collection/<cid>', json=True)
 def v1_fc_get(store, cid):
     '''Retrieve a single feature collection.
 
