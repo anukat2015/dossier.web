@@ -10,6 +10,8 @@ from itertools import ifilter, islice
 import logging
 import random as rand
 
+from dossier.fc import SparseVector, StringCounter
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,36 +37,54 @@ def random(store):
     return _
 
 
-def plain_index_scan(store):
+class plain_index_scan(object):
     '''Return a random sample of an index scan.
 
     This scans all indexes defined for all values in the query
     corresponding to those indexes.
     '''
-    def streaming_ids(content_id):
-        query_fc = store.get(content_id)
+    def __init__(self, store):
+        self.store = store
+
+    def get_query_fc(self, content_id):
+        query_fc = self.store.get(content_id)
         if query_fc is None:
             logger.info('Could not find FC for "%s"', content_id)
+        return query_fc
+
+    def streaming_ids(self, content_id):
+        def scan(idx_name, val):
+            for cid in self.store.index_scan(idx_name, val):
+                if cid not in cids and cid not in blacklist:
+                    cids.add(cid)
+                    yield cid
+
+        query_fc = self.get_query_fc(content_id)
+        if query_fc is None:
             return
 
         blacklist = {content_id}
         cids = set()
-        for idx_name in store.index_names():
-            for name in query_fc.get(idx_name, {}):
+        for idx_name in self.store.index_names():
+            feat = query_fc.get(idx_name, None)
+            if isinstance(feat, unicode):
                 logger.info('index scanning for "%s" (content id: %s)',
-                            name, content_id)
-                for cid in store.index_scan(idx_name, name):
-                    if cid not in cids and cid not in blacklist:
-                        cids.add(cid)
+                            feat, content_id)
+                for cid in scan(idx_name, feat):
+                    yield cid
+            elif isinstance(feat, (SparseVector, StringCounter)):
+                for name in feat.iterkeys():
+                    logger.info('index scanning for "%s" (content id: %s)',
+                                name, content_id)
+                    for cid in scan(idx_name, name):
                         yield cid
 
-    def _(content_id, filter_pred, limit):
-        cids = streaming_ids(content_id)
+    def __call__(self, content_id, filter_pred, limit):
+        cids = self.streaming_ids(content_id)
         results = ifilter(lambda (cid, fc):
                               fc is not None and filter_pred((cid, fc)),
-                          ((cid, store.get(cid)) for cid in cids))
+                          ((cid, self.store.get(cid)) for cid in cids))
         return {'results': streaming_sample(results, limit, limit * 10)}
-    return _
 
 
 def streaming_sample(seq, k, limit=None):
