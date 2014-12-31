@@ -65,17 +65,18 @@ class plain_index_scan(object):
 
         blacklist = {content_id}
         cids = set()
+        logger.info('starting index scan (query content id: %s)', content_id)
         for idx_name in self.store.index_names():
             feat = query_fc.get(idx_name, None)
             if isinstance(feat, unicode):
-                logger.info('index scanning for "%s" (content id: %s)',
-                            feat, content_id)
+                logger.info('[Unicode index: %s] scanning for "%s"',
+                            idx_name, feat)
                 for cid in scan(idx_name, feat):
                     yield cid
             elif isinstance(feat, (SparseVector, StringCounter)):
                 for name in feat.iterkeys():
-                    logger.info('index scanning for "%s" (content id: %s)',
-                                name, content_id)
+                    logger.info('[StringCounter index: %s] scanning for "%s"',
+                                idx_name, name)
                     for cid in scan(idx_name, name):
                         yield cid
 
