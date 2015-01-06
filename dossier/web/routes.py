@@ -234,23 +234,96 @@ def v1_label_put(request, response, config, label_hooks,
 
 
 @app.get('/dossier/v1/label/<cid>/direct', json=True)
-def v1_label_direct(request, response, label_store, cid):
-    labs = imap(label_to_json, label_store.directly_connected(cid))
+@app.get('/dossier/v1/label/<cid>/subtopic/<subid>/direct', json=True)
+def v1_label_direct(request, response, label_store, cid, subid=None):
+    '''Return directly connected labels.
+
+    The routes for this endpoint are
+    ``/dossier/v1/label/<cid>/direct`` and
+    ``/dossier/v1/label/<cid>/subtopic/<subid>/direct``.
+
+    This returns all directly connected labels for ``cid``. Or, if
+    a subtopic id is given, then only directly connected labels for
+    ``(cid, subid)`` are returned.
+
+    The data returned is a JSON list of labels. Each label is a
+    dictionary with the following keys: ``content_id1``,
+    ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
+    ``annotator_id``, ``epoch_ticks`` and ``value``.
+    '''
+    ident = make_ident(cid, subid)
+    labs = imap(label_to_json, label_store.directly_connected(ident))
     return list(paginate(request, response, labs))
 
 
-@app.get('/dossier/v1/label/<cid>/positive', json=True)
-def v1_label_positive(request, response, label_store, cid):
-    method = {
-        'connected': label_store.connected_component,
-        'expanded': label_store.expand,
-    }[request.query.get('method', 'connected')]
-    labs = imap(label_to_json, method(cid))
+@app.get('/dossier/v1/label/<cid>/connected', json=True)
+@app.get('/dossier/v1/label/<cid>/subtopic/<subid>/connected', json=True)
+def v1_label_connected(request, response, label_store, cid, subid=None):
+    '''Return a connected component of positive labels.
+
+    The routes for this endpoint are
+    ``/dossier/v1/label/<cid>/connected`` and
+    ``/dossier/v1/label/<cid>/subtopic/<subid>/connected``.
+
+    This returns the edges for the connected component of
+    either ``cid`` or ``(cid, subid)`` if a subtopic identifier
+    is given.
+
+    The data returned is a JSON list of labels. Each label is a
+    dictionary with the following keys: ``content_id1``,
+    ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
+    ``annotator_id``, ``epoch_ticks`` and ``value``.
+    '''
+    ident = make_ident(cid, subid)
+    labs = imap(label_to_json, label_store.connected_component(ident))
     return list(paginate(request, response, labs))
 
 
-@app.get('/dossier/v1/label/<cid>/negative', json=True)
-def v1_label_negative(request, response, label_store, cid):
+@app.get('/dossier/v1/label/<cid>/expanded', json=True)
+@app.get('/dossier/v1/label/<cid>/subtopic/<subid>/expanded', json=True)
+def v1_label_expanded(request, response, label_store, cid, subid=None):
+    '''Return an expansion of the connected component of positive labels.
+
+    The routes for this endpoint are
+    ``/dossier/v1/label/<cid>/expanded`` and
+    ``/dossier/v1/label/<cid>/subtopic/<subid>/expanded``.
+
+    This returns the edges for the expansion of the connected component
+    of either ``cid`` or ``(cid, subid)`` if a subtopic identifier is
+    given. Note that the expansion of a set of labels does not provide
+    any new information content over a connected component. It is
+    provided as a convenience for clients that want all possible labels
+    in a connected component, regardless of whether one explicitly
+    exists or not.
+
+    The data returned is a JSON list of labels. Each label is a
+    dictionary with the following keys: ``content_id1``,
+    ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
+    ``annotator_id``, ``epoch_ticks`` and ``value``.
+    '''
+    ident = make_ident(cid, subid)
+    labs = imap(label_to_json, label_store.connected_component(ident))
+    return list(paginate(request, response, labs))
+
+
+@app.get('/dossier/v1/label/<cid>/negative-inference', json=True)
+def v1_label_negative_inference(request, response, label_store, cid):
+    '''Return inferred negative labels.
+
+    The route for this endpoint is:
+    ``/dossier/v1/label/<cid>/negative-inference``.
+
+    Negative labels are inferred by first getting all other content ids
+    connected to ``cid`` through a negative label. For each directly
+    adjacent ``cid'``, the connected components of ``cid`` and
+    ``cid'`` are traversed to find negative labels.
+
+    The data returned is a JSON list of labels. Each label is a
+    dictionary with the following keys: ``content_id1``,
+    ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
+    ``annotator_id``, ``epoch_ticks`` and ``value``.
+    '''
+    # No subtopics yet? :-(
     labs = imap(label_to_json, label_store.negative_inference(cid))
     return list(paginate(request, response, labs))
 
@@ -268,6 +341,13 @@ def fc_to_json(fc):
         if isinstance(feat, (unicode, StringCounter)):
             d[name] = feat
     return d
+
+
+def make_ident(content_id, subtopic_id):
+    if subtopic_id is None:
+        return content_id
+    else:
+        return (content_id, subtopic_id)
 
 
 def label_to_json(lab):
