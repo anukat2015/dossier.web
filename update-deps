@@ -12,5 +12,5 @@ sdrepo="$1"
 dest="./dossier/web/static/v1/deps/"
 cp "$sdrepo/src/SortingQueue/css/SortingQueue.css" "$dest"
 cp "$sdrepo/src/SortingQueue/SortingQueue.js" "$dest"
-cp "$sdrepo/dossier.js/Dossier.js" "$dest"
+cp "$sdrepo/src/dossier.js/Dossier.js" "$dest"
 
