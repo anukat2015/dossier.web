@@ -235,7 +235,7 @@ def v1_label_put(request, response, config, label_hooks,
 
 @app.get('/dossier/v1/label/<cid>/direct', json=True)
 def v1_label_direct(request, response, label_store, cid):
-    labs = imap(label_to_json, label_store.get_all_for_content_id(cid))
+    labs = imap(label_to_json, label_store.directly_connected(cid))
     return list(paginate(request, response, labs))
 
 
