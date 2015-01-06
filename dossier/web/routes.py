@@ -21,7 +21,7 @@ The API end points are documented as functions in this module.
 
 '''
 from __future__ import absolute_import, division, print_function
-from itertools import imap, islice
+from itertools import groupby, imap, islice
 import json
 import logging
 import os.path as path
@@ -328,6 +328,182 @@ def v1_label_negative_inference(request, response, label_store, cid):
     return list(paginate(request, response, labs))
 
 
+@app.get('/dossier/v1/folder', json=True)
+def v1_folder_list(request, store):
+    '''Retrieves a list of folders for the current user.
+
+    The route for this endpoint is: ``GET /dossier/v1/folder``.
+
+    (Temporarily, the "current user" can be set via the
+    ``annotator_id`` query parameter.)
+
+    The payload returned is a list of folder identifiers.
+    '''
+    annotator_id = get_annotator_id(request)
+    prefix = '|'.join(['topic', annotator_id, ''])  # break the abstraction!
+    logger.info('Scanning for folders with prefix %r', prefix)
+    return map(lambda cid: unwrap_folder_content_id(cid)['folder_id'],
+               store.scan_prefix_ids(prefix))
+
+
+@app.put('/dossier/v1/folder/<fid>')
+def v1_folder_add(request, response, store, fid):
+    '''Adds a folder belonging to the current user.
+
+    The route for this endpoint is: ``PUT /dossier/v1/folder/<fid>``.
+
+    If the folder was added successfully, ``201`` status is returned.
+
+    (Temporarily, the "current user" can be set via the
+    ``annotator_id`` query parameter.)
+    '''
+    assert_valid_folder_id(fid)
+    annotator_id = get_annotator_id(request)
+
+    content_id = wrap_folder_content_id(annotator_id, fid)
+    store.put([(content_id, FeatureCollection())])
+    logger.info('Added folder %r with content id %r', fid, content_id)
+    response.satus = 201
+
+
+@app.get('/dossier/v1/folder/<fid>/subfolder', json=True)
+def v1_subfolder_list(request, response, store, label_store, fid):
+    '''Retrieves a list of subfolders in a folder for the current user.
+
+    The route for this endpoint is:
+    ``GET /dossier/v1/folder/<fid>/subfolder``.
+
+    (Temporarily, the "current user" can be set via the
+    ``annotator_id`` query parameter.)
+
+    The payload returned is a list of subfolder identifiers.
+    '''
+    assert_valid_folder_id(fid)
+    annotator_id = get_annotator_id(request)
+
+    folder_content_id = wrap_folder_content_id(annotator_id, fid)
+    if store.get(folder_content_id) is None:
+        bottle.abort(404, "Folder '%s' does not exist." % fid)
+    all_labels = label_store.directly_connected(folder_content_id)
+    return list(dedup(la.subtopic_for(folder_content_id) for la in all_labels))
+
+
+@app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
+def v1_subfolder_add(request, response, store, label_store,
+                     fid, sfid, cid, subid):
+    '''Adds a subtopic to a subfolder for the current user.
+
+    The route for this endpoint is:
+    ``PUT /dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>``.
+
+    ``fid`` is the folder identifier, e.g., ``My_Folder``.
+
+    ``sfid`` is the subfolder identifier, e.g., ``My_Subtopic``.
+
+    ``cid`` and ``subid`` are the content id and subtopic id of the
+    subtopic being added to the subfolder.
+
+    If the subfolder does not already exist, it is created
+    automatically. N.B. An empty subfolder cannot exist!
+
+    If the subtopic was added successfully, ``201`` status is returned.
+
+    (Temporarily, the "current user" can be set via the
+    ``annotator_id`` query parameter.)
+    '''
+    assert_valid_folder_id(fid)
+    assert_valid_folder_id(sfid)
+    annotator_id = get_annotator_id(request)
+    folder_content_id = wrap_folder_content_id(annotator_id, fid)
+    subfolder_subtopic_id = wrap_subfolder_subtopic_id(sfid)
+
+    if store.get(folder_content_id) is None:
+        bottle.abort(404, "Folder '%s' does not exist." % fid)
+
+    lab = Label(folder_content_id, cid, annotator_id, CorefValue.Positive,
+                subtopic_id1=subfolder_subtopic_id,
+                subtopic_id2=subid)
+    label_store.put(lab)
+    response.satus = 201
+
+
+@app.get('/dossier/v1/folder/<fid>/subfolder/<sfid>', json=True)
+def v1_subtopic_list(request, store, label_store, fid, sfid):
+    '''Retrieves a list of items in a subfolder.
+
+    The route for this endpoint is:
+    ``GET /dossier/v1/folder/<fid>/subfolder/<sfid>``.
+
+    (Temporarily, the "current user" can be set via the
+    ``annotator_id`` query parameter.)
+
+    The payload returned is a list of two element arrays. The first
+    element in the array is the item's content id and the second
+    element is the item's subtopic id.
+    '''
+    assert_valid_folder_id(fid)
+    assert_valid_folder_id(sfid)
+    annotator_id = get_annotator_id(request)
+    folder_content_id = wrap_folder_content_id(annotator_id, fid)
+    subfolder_subtopic_id = wrap_subfolder_subtopic_id(sfid)
+    ident = (folder_content_id, subfolder_subtopic_id)
+
+    if store.get(folder_content_id) is None:
+        bottle.abort(404, "Folder '%s' does not exist." % fid)
+
+    items = []
+    for lab in label_store.connected_component(ident):
+        cid = lab.other(folder_content_id)
+        subid = lab.subtopic_for(cid)
+        items.append((cid, subid))
+    return items
+
+
+def folder_id_to_name(ident):
+    return ident.replace('_', ' ')
+
+
+def folder_name_to_id(name):
+    return name.replace(' ', '_')
+
+
+def wrap_folder_content_id(annotator_id, fid):
+    return '|'.join([
+        'topic',
+        urllib.quote(annotator_id, safe='~'),
+        urllib.quote(fid, safe='~'),
+    ])
+
+
+def unwrap_folder_content_id(cid):
+    _, annotator_id, fid = cid.split('|')
+    return {
+        'annotator_id': urllib.unquote(annotator_id),
+        'folder_id': urllib.unquote(fid),
+    }
+
+
+def wrap_subfolder_subtopic_id(sfid):
+    return sfid
+
+
+def unwrap_subfolder_subtopic_id(subtopic_id):
+    return sfid
+
+
+def assert_valid_folder_id(ident):
+    if ' ' in ident or '/' in ident:
+        bottle.abort(500,
+            "Folder ids cannot contain spaces or '/' characters.")
+
+
+def get_annotator_id(request):
+    # TODO: Get the annotator id from REMOTE_USER environment variable?
+    # Currently, we're just accepting anything in the query parameter
+    # `annotator_id` (and assuming `unknown` if absent). ---AG
+    return request.query.get('annotator_id', 'unknown')
+
+
 def str_to_max_int(s, maximum):
     try:
         return min(maximum, int(s))
@@ -391,3 +567,11 @@ def set_query_param(url, param, value):
     params[param] = value
     qs = urllib.urlencode(params, doseq=True)
     return urlparse.urlunsplit((scheme, netloc, path, qs, frag))
+
+
+def dedup(it):
+    '''Dedups a sorted iterable in constant memory.'''
+    for _, group in groupby(it):
+        for lab in group:
+            yield lab
+            break
