@@ -46,6 +46,13 @@ class plain_index_scan(object):
     def __init__(self, store):
         self.store = store
 
+    def __call__(self, content_id, filter_pred, limit):
+        cids = self.streaming_ids(content_id)
+        results = ifilter(lambda (cid, fc):
+                              fc is not None and filter_pred((cid, fc)),
+                          ((cid, self.store.get(cid)) for cid in cids))
+        return {'results': streaming_sample(results, limit, limit * 10)}
+
     def get_query_fc(self, content_id):
         query_fc = self.store.get(content_id)
         if query_fc is None:
@@ -79,13 +86,6 @@ class plain_index_scan(object):
                                 idx_name, name)
                     for cid in scan(idx_name, name):
                         yield cid
-
-    def __call__(self, content_id, filter_pred, limit):
-        cids = self.streaming_ids(content_id)
-        results = ifilter(lambda (cid, fc):
-                              fc is not None and filter_pred((cid, fc)),
-                          ((cid, self.store.get(cid)) for cid in cids))
-        return {'results': streaming_sample(results, limit, limit * 10)}
 
 
 def streaming_sample(seq, k, limit=None):
