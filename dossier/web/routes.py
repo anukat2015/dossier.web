@@ -18,6 +18,15 @@ The API end points are documented as functions in this module.
 .. autofunction:: v1_fc_put
 .. autofunction:: v1_random_fc_get
 .. autofunction:: v1_label_put
+.. autofunction:: v1_label_direct
+.. autofunction:: v1_label_connected
+.. autofunction:: v1_label_expanded
+.. autofunction:: v1_label_negative_inference
+.. autofunction:: v1_folder_list
+.. autofunction:: v1_folder_add
+.. autofunction:: v1_subfolder_list
+.. autofunction:: v1_subfolder_add
+.. autofunction:: v1_subtopic_list
 
 '''
 from __future__ import absolute_import, division, print_function
