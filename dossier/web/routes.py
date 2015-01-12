@@ -1,4 +1,7 @@
-'''dossier.web.routes.app is a REST stateful web service that can
+'''
+Web service for active learning
+===============================
+dossier.web.routes.app is a REST stateful web service that can
 drive Dossier Stack's an active ranking models and user interface, as
 well as other search technologies.
 
@@ -22,12 +25,48 @@ The API end points are documented as functions in this module.
 .. autofunction:: v1_label_connected
 .. autofunction:: v1_label_expanded
 .. autofunction:: v1_label_negative_inference
+
+
+Managing folders and sub-folders
+================================
+In many places where active learning is used, it can be useful to
+provide the user with a means to group and categorize topics. In an
+active learning setting, it is essential that we try to capture a
+user's grouping of topics so that it can be used for ground truth data.
+To that end, ``dossier.web`` exposes a set of web service endpoints
+for managing folders and subfolders for a particular user. Folders and
+subfolders are stored and managed by :mod:`dossier.label`, which means
+they are automatically available as ground truth data.
+
+The actual definition of what a folder or subfolder is depends on the
+task the user is trying to perform. We tend to think of a folder as a
+general topic and a subfolder as a more specific topic or "subtopic."
+For example, a topic might be "cars" and some subtopics might be
+"dealerships with cars I want to buy" or "electric cars."
+
+The following end points allow one to add or list folders and
+subfolders. There is also an endpoint for listing all of the items
+in a single subfolder, where each item is a pair of ``(content_id,
+subtopic_id)``.
+
+In general, the identifier of a folder/subfolder is also used as its
+name, similar to how identifiers in Wikipedia work. For example, if
+a folder has a name "My Cars", then its identifier is ``My_Cars``.
+More specifically, given any folder name ``NAME``, its corresponding
+identifier can be obtained with ``NAME.replace(' ', '_')``.
+
+All web routes accept and return *identifiers* (so space characters are
+disallowed).
+
+(Currently, there is no simple way to modify the name of an existing
+folder or sub-folder. There is also no simple way to delete an existing
+folder or sub-folder.)
+
 .. autofunction:: v1_folder_list
 .. autofunction:: v1_folder_add
 .. autofunction:: v1_subfolder_list
 .. autofunction:: v1_subfolder_add
 .. autofunction:: v1_subtopic_list
-
 '''
 from __future__ import absolute_import, division, print_function
 from itertools import groupby, imap, islice
@@ -219,14 +258,19 @@ def v1_label_put(request, response, config, label_hooks,
     ``-1`` for not coreferent, ``0`` for "I don't know if they
     are coreferent" and ``1`` for coreferent.
 
+    Optionally, the query parameters ``subtopic_id1`` and
+    ``subtopic_id2`` may be specified. Neither, both or either may
+    be given. ``subtopic_id1`` corresponds to a subtopic in
+    ``content_id1`` and ``subtopic_id2`` corresponds to a subtopic
+    in ``content_id2``.
+
     This endpoint returns status ``201`` upon successful storage.
     Any existing labels with the given ids are overwritten.
 
     After the label is stored, any label hooks passed via ``label_hooks``
-    are executed.
-
-    Currently, there is no way to *retrieve* labels through the
-    API.
+    are executed. Each label hook should satisfy
+    ``yakonfig.AutoFactory``. Once created, the label hook should be
+    a function of one parameter: a :class:`dossier.label.Label`.
     '''
     coref_value = CorefValue(int(request.body.read()))
     lab = Label(cid1, cid2, annotator_id, coref_value,
@@ -497,7 +541,7 @@ def wrap_subfolder_subtopic_id(sfid):
 
 
 def unwrap_subfolder_subtopic_id(subtopic_id):
-    return sfid
+    return subtopic_id
 
 
 def assert_valid_folder_id(ident):
