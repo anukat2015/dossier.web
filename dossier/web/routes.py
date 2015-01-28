@@ -416,7 +416,7 @@ def v1_folder_add(request, response, store, fid):
     content_id = wrap_folder_content_id(annotator_id, fid)
     store.put([(content_id, FeatureCollection())])
     logger.info('Added folder %r with content id %r', fid, content_id)
-    response.satus = 201
+    response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder', json=True)
@@ -478,7 +478,7 @@ def v1_subfolder_add(request, response, store, label_store,
                 subtopic_id1=subfolder_subtopic_id,
                 subtopic_id2=subid)
     label_store.put(lab)
-    response.satus = 201
+    response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder/<sfid>', json=True)
