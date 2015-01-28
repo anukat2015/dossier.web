@@ -438,7 +438,8 @@ def v1_subfolder_list(request, response, store, label_store, fid):
     if store.get(folder_content_id) is None:
         bottle.abort(404, "Folder '%s' does not exist." % fid)
     all_labels = label_store.directly_connected(folder_content_id)
-    return list(dedup(la.subtopic_for(folder_content_id) for la in all_labels))
+    subs = sorted([la.subtopic_for(folder_content_id) for la in all_labels])
+    return list(dedup(subs))
 
 
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
