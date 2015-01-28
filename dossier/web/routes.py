@@ -72,6 +72,7 @@ from __future__ import absolute_import, division, print_function
 from itertools import groupby, imap, islice
 import json
 import logging
+import os
 import os.path as path
 import urllib
 import urlparse
@@ -511,6 +512,18 @@ def v1_subtopic_list(request, store, label_store, fid, sfid):
         subid = lab.subtopic_for(cid)
         items.append((cid, subid))
     return items
+
+
+if os.getenv('DOSSIER_WEB_DEV', '0') == '1':
+    @app.delete('/dossier/v1/delete-all-labels')
+    def v1_delete_all_labels(response, store, label_store):
+        label_store.delete_all()
+        # Since the foldering system relies on the FC table for determining
+        # folders, we need to delete those too. (But we otherwise leave all
+        # FCs alone.)
+        for cid in store.scan_prefix_ids('topic|'):
+            store.delete(cid)
+        response.status = 204
 
 
 def folder_id_to_name(ident):
