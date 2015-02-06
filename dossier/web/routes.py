@@ -69,6 +69,7 @@ folder or sub-folder.)
 .. autofunction:: v1_subtopic_list
 '''
 from __future__ import absolute_import, division, print_function
+from functools import partial
 from itertools import groupby, imap, islice
 import json
 import logging
@@ -95,7 +96,8 @@ def v1_static(name):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>', json=True)
-def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
+def v1_search(request, visid_to_dbid, dbid_to_visid,
+              config, search_engines, filter_preds, cid, engine_name):
     '''Search feature collections.
 
     The route for this endpoint is:
@@ -124,6 +126,7 @@ def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
       query ``content_id``.
     '''
     omit_fc = request.query.pop('omit_fc', '0') == '1'
+    db_cid = visid_to_dbid(cid)
 
     try:
         search_engine = search_engines[engine_name]
@@ -142,25 +145,25 @@ def v1_search(request, config, search_engines, filter_preds, cid, engine_name):
 
     filter_pred = lambda _: True
     if len(init_filter_preds) > 0:
-        preds = map(lambda p: config.create(p)(cid), init_filter_preds)
-        filter_pred = lambda (cid, fc): all(p((cid, fc)) for p in preds)
+        preds = map(lambda p: config.create(p)(db_cid), init_filter_preds)
+        filter_pred = lambda (db_cid, fc): all(p((db_cid, fc)) for p in preds)
 
     kwargs = dict(request.query)
     kwargs['filter_pred'] = filter_pred
     kwargs['limit'] = str_to_max_int(request.query.get('limit'), 100)
 
-    results = search_engine(cid, **kwargs)
+    results = search_engine(db_cid, **kwargs)
     transformed = []
     for t in results['results']:
         if len(t) == 2:
-            cid, fc = t
+            db_cid, fc = t
             info = {}
         elif len(t) == 3:
-            cid, fc, info = t
+            db_cid, fc, info = t
         else:
             bottle.abort(500, 'Invalid search result: "%r"' % t)
         result = info
-        result['content_id'] = cid
+        result['content_id'] = dbid_to_visid(db_cid)
         if not omit_fc:
             result['fc'] = fc_to_json(fc)
         transformed.append(result)
@@ -185,7 +188,7 @@ def v1_search_engines(search_engines):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>', json=True)
-def v1_fc_get(store, cid):
+def v1_fc_get(visid_to_dbid, store, cid):
     '''Retrieve a single feature collection.
 
     The route for this endpoint is:
@@ -194,14 +197,14 @@ def v1_fc_get(store, cid):
     This endpoint returns a JSON serialization of the feature collection
     identified by ``content_id``.
     '''
-    fc = store.get(cid)
+    fc = store.get(visid_to_dbid(cid))
     if fc is None:
         bottle.abort(404, 'Feature collection "%s" does not exist.' % cid)
     return fc_to_json(fc)
 
 
 @app.put('/dossier/v1/feature-collection/<cid>')
-def v1_fc_put(request, response, store, cid):
+def v1_fc_put(request, response, visid_to_dbid, store, cid):
     '''Store a single feature collection.
 
     The route for this endpoint is:
@@ -216,12 +219,12 @@ def v1_fc_put(request, response, store, cid):
     overwritten.
     '''
     fc = FeatureCollection.from_dict(json.load(request.body))
-    store.put([(cid, fc)])
+    store.put([(visid_to_dbid(cid), fc)])
     response.status = 201
 
 
 @app.get('/dossier/v1/random/feature-collection', json=True)
-def v1_random_fc_get(response, store):
+def v1_random_fc_get(response, dbid_to_visid, store):
     '''Retrieves a random feature collection from the database.
 
     The route for this endpoint is:
@@ -241,11 +244,11 @@ def v1_random_fc_get(response, store):
     sample = streaming_sample(store.scan_ids(), 1, 1000)
     if len(sample) == 0:
         bottle.abort(404, 'The feature collection store is empty.')
-    return [sample[0], fc_to_json(store.get(sample[0]))]
+    return [dbid_to_visid(sample[0]), fc_to_json(store.get(sample[0]))]
 
 
 @app.put('/dossier/v1/label/<cid1>/<cid2>/<annotator_id>')
-def v1_label_put(request, response, config, label_hooks,
+def v1_label_put(request, response, visid_to_dbid, config, label_hooks,
                  label_store, cid1, cid2, annotator_id):
     '''Store a single label.
 
@@ -274,7 +277,8 @@ def v1_label_put(request, response, config, label_hooks,
     a function of one parameter: a :class:`dossier.label.Label`.
     '''
     coref_value = CorefValue(int(request.body.read()))
-    lab = Label(cid1, cid2, annotator_id, coref_value,
+    lab = Label(visid_to_dbid(cid1), visid_to_dbid(cid2),
+                annotator_id, coref_value,
                 subtopic_id1=request.query.get('subtopic_id1'),
                 subtopic_id2=request.query.get('subtopic_id2'))
     label_store.put(lab)
@@ -289,7 +293,8 @@ def v1_label_put(request, response, config, label_hooks,
 
 @app.get('/dossier/v1/label/<cid>/direct', json=True)
 @app.get('/dossier/v1/label/<cid>/subtopic/<subid>/direct', json=True)
-def v1_label_direct(request, response, label_store, cid, subid=None):
+def v1_label_direct(request, response, visid_to_dbid, dbid_to_visid,
+                    label_store, cid, subid=None):
     '''Return directly connected labels.
 
     The routes for this endpoint are
@@ -305,14 +310,16 @@ def v1_label_direct(request, response, label_store, cid, subid=None):
     ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
     ``annotator_id``, ``epoch_ticks`` and ``value``.
     '''
-    ident = make_ident(cid, subid)
-    labs = imap(label_to_json, label_store.directly_connected(ident))
+    lab_to_json = partial(label_to_json, dbid_to_visid)
+    ident = make_ident(visid_to_dbid(cid), subid)
+    labs = imap(lab_to_json, label_store.directly_connected(ident))
     return list(paginate(request, response, labs))
 
 
 @app.get('/dossier/v1/label/<cid>/connected', json=True)
 @app.get('/dossier/v1/label/<cid>/subtopic/<subid>/connected', json=True)
-def v1_label_connected(request, response, label_store, cid, subid=None):
+def v1_label_connected(request, response, visid_to_dbid, dbid_to_visid,
+                       label_store, cid, subid=None):
     '''Return a connected component of positive labels.
 
     The routes for this endpoint are
@@ -328,14 +335,16 @@ def v1_label_connected(request, response, label_store, cid, subid=None):
     ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
     ``annotator_id``, ``epoch_ticks`` and ``value``.
     '''
-    ident = make_ident(cid, subid)
-    labs = imap(label_to_json, label_store.connected_component(ident))
+    lab_to_json = partial(label_to_json, dbid_to_visid)
+    ident = make_ident(visid_to_dbid(cid), subid)
+    labs = imap(lab_to_json, label_store.connected_component(ident))
     return list(paginate(request, response, labs))
 
 
 @app.get('/dossier/v1/label/<cid>/expanded', json=True)
 @app.get('/dossier/v1/label/<cid>/subtopic/<subid>/expanded', json=True)
-def v1_label_expanded(request, response, label_store, cid, subid=None):
+def v1_label_expanded(request, response, label_store,
+                      visid_to_dbid, dbid_to_visid, cid, subid=None):
     '''Return an expansion of the connected component of positive labels.
 
     The routes for this endpoint are
@@ -355,13 +364,16 @@ def v1_label_expanded(request, response, label_store, cid, subid=None):
     ``content_id2``, ``subtopic_id1``, ``subtopic_id2``,
     ``annotator_id``, ``epoch_ticks`` and ``value``.
     '''
-    ident = make_ident(cid, subid)
-    labs = imap(label_to_json, label_store.connected_component(ident))
+    lab_to_json = partial(label_to_json, dbid_to_visid)
+    ident = make_ident(visid_to_dbid(cid), subid)
+    labs = imap(lab_to_json, label_store.connected_component(ident))
     return list(paginate(request, response, labs))
 
 
 @app.get('/dossier/v1/label/<cid>/negative-inference', json=True)
-def v1_label_negative_inference(request, response, label_store, cid):
+def v1_label_negative_inference(request, response,
+                                visid_to_dbid, dbid_to_visid,
+                                label_store, cid):
     '''Return inferred negative labels.
 
     The route for this endpoint is:
@@ -378,7 +390,9 @@ def v1_label_negative_inference(request, response, label_store, cid):
     ``annotator_id``, ``epoch_ticks`` and ``value``.
     '''
     # No subtopics yet? :-(
-    labs = imap(label_to_json, label_store.negative_inference(cid))
+    lab_to_json = partial(label_to_json, dbid_to_visid)
+    labs = imap(lab_to_json,
+                label_store.negative_inference(visid_to_dbid(cid)))
     return list(paginate(request, response, labs))
 
 
@@ -445,7 +459,7 @@ def v1_subfolder_list(request, response, store, label_store, fid):
 
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
 def v1_subfolder_add(request, response, store, label_store,
-                     fid, sfid, cid, subid):
+                     visid_to_dbid, fid, sfid, cid, subid):
     '''Adds a subtopic to a subfolder for the current user.
 
     The route for this endpoint is:
@@ -475,7 +489,8 @@ def v1_subfolder_add(request, response, store, label_store,
     if store.get(folder_content_id) is None:
         bottle.abort(404, "Folder '%s' does not exist." % fid)
 
-    lab = Label(folder_content_id, cid, annotator_id, CorefValue.Positive,
+    lab = Label(folder_content_id, visid_to_dbid(cid),
+                annotator_id, CorefValue.Positive,
                 subtopic_id1=subfolder_subtopic_id,
                 subtopic_id2=subid)
     label_store.put(lab)
@@ -483,7 +498,7 @@ def v1_subfolder_add(request, response, store, label_store,
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder/<sfid>', json=True)
-def v1_subtopic_list(request, store, label_store, fid, sfid):
+def v1_subtopic_list(request, store, dbid_to_visid, label_store, fid, sfid):
     '''Retrieves a list of items in a subfolder.
 
     The route for this endpoint is:
@@ -510,7 +525,7 @@ def v1_subtopic_list(request, store, label_store, fid, sfid):
     for lab in label_store.connected_component(ident):
         cid = lab.other(folder_content_id)
         subid = lab.subtopic_for(cid)
-        items.append((cid, subid))
+        items.append((dbid_to_visid(cid), subid))
     return items
 
 
@@ -593,9 +608,11 @@ def make_ident(content_id, subtopic_id):
         return (content_id, subtopic_id)
 
 
-def label_to_json(lab):
+def label_to_json(dbid_to_visid, lab):
     lab = {f: getattr(lab, f) for f in lab._fields}
     lab['value'] = lab['value'].value
+    lab['content_id1'] = dbid_to_visid(lab['content_id1'])
+    lab['content_id2'] = dbid_to_visid(lab['content_id2'])
     return lab
 
 

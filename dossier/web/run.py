@@ -28,7 +28,9 @@ from dossier.web import search_engines as builtin_engines
 
 def get_application(routes=None, search_engines=None,
                     filter_preds=None, more_configurables=None,
-                    label_hooks=None):
+                    label_hooks=None,
+                    dbid_to_visid=lambda x: x,
+                    visid_to_dbid=lambda x: x):
     '''Build and return a Bottle WSGI compatible application.
 
     The application returned is a ``Bottle`` app, which means you run it
@@ -81,7 +83,8 @@ def get_application(routes=None, search_engines=None,
                 pass
         sys.exit(0)
 
-    configure_app(web_conf, search_engines, filter_preds, label_hooks)
+    configure_app(web_conf, search_engines, filter_preds, label_hooks,
+                  dbid_to_visid, visid_to_dbid)
 
     for add_routes in routes:
         add_routes(app)
@@ -96,7 +99,8 @@ def get_application(routes=None, search_engines=None,
 
 # note that `app` is global from dossier.web.routes
 def configure_app(web_conf=None, search_engines=None,
-                  filter_preds=None, label_hooks=None):
+                  filter_preds=None, label_hooks=None,
+                  dbid_to_visid=lambda x: x, visid_to_dbid=lambda x: x):
     if web_conf is None:
         web_conf = config.Config()
     search_engines = search_engines or {
@@ -124,6 +128,10 @@ def configure_app(web_conf=None, search_engines=None,
         config.create_injector('request', lambda: bottle.request))
     app.install(
         config.create_injector('response', lambda: bottle.response))
+    app.install(
+        config.create_injector('dbid_to_visid', lambda: dbid_to_visid))
+    app.install(
+        config.create_injector('visid_to_dbid', lambda: visid_to_dbid))
 
     @app.hook('after_request')
     def enable_cors():
