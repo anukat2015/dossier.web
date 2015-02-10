@@ -540,6 +540,11 @@ if os.getenv('DOSSIER_WEB_DEV', '0') == '1':
             store.delete(cid)
         response.status = 204
 
+    @app.delete('/dossier/v1/delete-all-fcs')
+    def v1_delete_all_fcs(response, store):
+        store.delete_all()
+        response.status = 204
+
 
 def folder_id_to_name(ident):
     return ident.replace('_', ' ')
