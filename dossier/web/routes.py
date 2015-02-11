@@ -82,6 +82,7 @@ import bottle
 
 from dossier.fc import FeatureCollection, StringCounter
 from dossier.label import Label, CorefValue
+from dossier.label.run import label_to_dict
 from dossier.web.search_engines import streaming_sample
 
 
@@ -397,7 +398,7 @@ def v1_label_negative_inference(request, response,
 
 
 @app.get('/dossier/v1/folder', json=True)
-def v1_folder_list(request, store):
+def v1_folder_list(request, folders):
     '''Retrieves a list of folders for the current user.
 
     The route for this endpoint is: ``GET /dossier/v1/folder``.
@@ -407,15 +408,11 @@ def v1_folder_list(request, store):
 
     The payload returned is a list of folder identifiers.
     '''
-    annotator_id = get_annotator_id(request)
-    prefix = '|'.join(['topic', annotator_id, ''])  # break the abstraction!
-    logger.info('Scanning for folders with prefix %r', prefix)
-    return map(lambda cid: unwrap_folder_content_id(cid)['folder_id'],
-               store.scan_prefix_ids(prefix))
+    return sorted(folders.folders(ann_id=request.query.get('annotator_id')))
 
 
 @app.put('/dossier/v1/folder/<fid>')
-def v1_folder_add(request, response, store, fid):
+def v1_folder_add(request, response, folders, fid):
     '''Adds a folder belonging to the current user.
 
     The route for this endpoint is: ``PUT /dossier/v1/folder/<fid>``.
@@ -425,17 +422,13 @@ def v1_folder_add(request, response, store, fid):
     (Temporarily, the "current user" can be set via the
     ``annotator_id`` query parameter.)
     '''
-    assert_valid_folder_id(fid)
-    annotator_id = get_annotator_id(request)
-
-    content_id = wrap_folder_content_id(annotator_id, fid)
-    store.put([(content_id, FeatureCollection())])
-    logger.info('Added folder %r with content id %r', fid, content_id)
+    ann_id = request.query.get('annotator_id')
+    folders.add_folder(fid, ann_id=ann_id)
     response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder', json=True)
-def v1_subfolder_list(request, response, store, label_store, fid):
+def v1_subfolder_list(request, response, folders, fid):
     '''Retrieves a list of subfolders in a folder for the current user.
 
     The route for this endpoint is:
@@ -446,19 +439,12 @@ def v1_subfolder_list(request, response, store, label_store, fid):
 
     The payload returned is a list of subfolder identifiers.
     '''
-    assert_valid_folder_id(fid)
-    annotator_id = get_annotator_id(request)
-
-    folder_content_id = wrap_folder_content_id(annotator_id, fid)
-    if store.get(folder_content_id) is None:
-        bottle.abort(404, "Folder '%s' does not exist." % fid)
-    all_labels = label_store.directly_connected(folder_content_id)
-    subs = sorted([la.subtopic_for(folder_content_id) for la in all_labels])
-    return list(dedup(subs))
+    ann_id = request.query.get('annotator_id')
+    return sorted(folders.subfolders(fid, ann_id=ann_id))
 
 
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
-def v1_subfolder_add(request, response, store, label_store,
+def v1_subfolder_add(request, response, folders,
                      visid_to_dbid, fid, sfid, cid, subid):
     '''Adds a subtopic to a subfolder for the current user.
 
@@ -480,25 +466,13 @@ def v1_subfolder_add(request, response, store, label_store,
     (Temporarily, the "current user" can be set via the
     ``annotator_id`` query parameter.)
     '''
-    assert_valid_folder_id(fid)
-    assert_valid_folder_id(sfid)
-    annotator_id = get_annotator_id(request)
-    folder_content_id = wrap_folder_content_id(annotator_id, fid)
-    subfolder_subtopic_id = wrap_subfolder_subtopic_id(sfid)
-
-    if store.get(folder_content_id) is None:
-        bottle.abort(404, "Folder '%s' does not exist." % fid)
-
-    lab = Label(folder_content_id, visid_to_dbid(cid),
-                annotator_id, CorefValue.Positive,
-                subtopic_id1=subfolder_subtopic_id,
-                subtopic_id2=subid)
-    label_store.put(lab)
+    ann_id = request.query.get('annotator_id')
+    folders.add_item(fid, sfid, visid_to_dbid(cid), subid, ann_id=ann_id)
     response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder/<sfid>', json=True)
-def v1_subtopic_list(request, store, dbid_to_visid, label_store, fid, sfid):
+def v1_subtopic_list(request, folders, dbid_to_visid, fid, sfid):
     '''Retrieves a list of items in a subfolder.
 
     The route for this endpoint is:
@@ -511,22 +485,9 @@ def v1_subtopic_list(request, store, dbid_to_visid, label_store, fid, sfid):
     element in the array is the item's content id and the second
     element is the item's subtopic id.
     '''
-    assert_valid_folder_id(fid)
-    assert_valid_folder_id(sfid)
-    annotator_id = get_annotator_id(request)
-    folder_content_id = wrap_folder_content_id(annotator_id, fid)
-    subfolder_subtopic_id = wrap_subfolder_subtopic_id(sfid)
-    ident = (folder_content_id, subfolder_subtopic_id)
-
-    if store.get(folder_content_id) is None:
-        bottle.abort(404, "Folder '%s' does not exist." % fid)
-
-    items = []
-    for lab in label_store.connected_component(ident):
-        cid = lab.other(folder_content_id)
-        subid = lab.subtopic_for(cid)
-        items.append((dbid_to_visid(cid), subid))
-    return items
+    ann_id = request.query.get('annotator_id')
+    items = folders.items(fid, sfid, ann_id=ann_id)
+    return sorted((dbid_to_visid(cid), subid) for cid, subid in items)
 
 
 if os.getenv('DOSSIER_WEB_DEV', '0') == '1':
@@ -614,11 +575,10 @@ def make_ident(content_id, subtopic_id):
 
 
 def label_to_json(dbid_to_visid, lab):
-    lab = {f: getattr(lab, f) for f in lab._fields}
-    lab['value'] = lab['value'].value
-    lab['content_id1'] = dbid_to_visid(lab['content_id1'])
-    lab['content_id2'] = dbid_to_visid(lab['content_id2'])
-    return lab
+    d = label_to_dict(lab)
+    d['content_id1'] = dbid_to_visid(d['content_id1'])
+    d['content_id2'] = dbid_to_visid(d['content_id2'])
+    return d
 
 
 def paginate(request, response, it):

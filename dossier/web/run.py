@@ -20,10 +20,10 @@ import kvlayer
 import yakonfig
 import yakonfig.factory
 
-from dossier.web import config
+from dossier.web import config, search_engines as builtin_engines
 from dossier.web.filter_preds import already_labeled
+from dossier.web.folder import Folders
 from dossier.web.routes import app
-from dossier.web import search_engines as builtin_engines
 
 
 def get_application(routes=None, search_engines=None,
@@ -118,6 +118,9 @@ def configure_app(web_conf=None, search_engines=None,
         config.create_injector('store', lambda: web_conf.store))
     app.install(
         config.create_injector('label_store', lambda: web_conf.label_store))
+    app.install(
+        config.create_injector(
+            'folders', lambda: Folders(web_conf.store, web_conf.label_store)))
     app.install(
         config.create_injector('search_engines', lambda: search_engines))
     app.install(
