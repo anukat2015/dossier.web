@@ -62,6 +62,17 @@ def test_subfolder_add_annotator(folders):
         == [('b', 'subb')]
 
 
+def test_subfolder_add_no_folder(folders):
+    with pytest.raises(KeyError):
+        folders.add_item('foo', 'subfoo', 'a', 'suba')
+
+
+def test_subfolder_add_no_folder_annotator(folders):
+    folders.add_folder('foo', ann_id='ann_foo')
+    with pytest.raises(KeyError):
+        folders.add_item('foo', 'subfoo', 'a', 'suba')
+
+
 def test_subfolder_add_bad_id(folders):
     folders.add_folder('foo')
     with pytest.raises(ValueError):
