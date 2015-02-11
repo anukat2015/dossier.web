@@ -139,7 +139,6 @@ class Folders(object):
         :param str ann_id: Username
         :rtype: generator of ``(content_id, subtopic_id)``
         '''
-        logger.info('huhuhuh')
         assert_valid_folder_id(folder_id)
         assert_valid_folder_id(subfolder_id)
         ann_id = self._annotator(ann_id)
