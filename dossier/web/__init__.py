@@ -22,8 +22,10 @@ Some useful utility functions.
 .. autofunction:: dossier.web.streaming_sample
 
 .. automodule:: dossier.web.routes
+.. automodule:: dossier.web.folder
 '''
 from dossier.web.filter_preds import already_labeled as filter_already_labeled
+from dossier.web.folder import Folders
 from dossier.web.interface import SearchEngine, Filter, Route
 from dossier.web.run import get_application, run_with_argv
 from dossier.web.search_engines import random as engine_random
@@ -31,6 +33,7 @@ from dossier.web.search_engines import plain_index_scan as engine_index_scan
 from dossier.web.search_engines import streaming_sample
 
 __all__ = [
+    'Folders',
     'SearchEngine', 'Filter', 'Route',
     'get_application', 'run_with_argv',
     'filter_already_labeled', 'engine_random', 'engine_index_scan',
