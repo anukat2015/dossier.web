@@ -79,3 +79,27 @@ def test_subfolder_add_bad_id(folders):
         folders.add_item('foo', 'sub foo', 'a', 'suba')
     with pytest.raises(ValueError):
         folders.add_item('foo', 'sub/foo', 'a', 'suba')
+
+
+def test_parent_subfolders(folders):
+    folders.add_folder('foo')
+    folders.add_item('foo', 'subfoo', 'a', 'suba')
+    assert list(folders.parent_subfolders('a')) == [('foo', 'subfoo')]
+    assert list(folders.parent_subfolders(('a', 'suba'))) \
+        == [('foo', 'subfoo')]
+
+
+def test_parent_subfolders_annotator(folders):
+    folders.add_folder('foo', ann_id='ann_foo')
+    folders.add_item('foo', 'subfoo', 'a', 'suba', ann_id='ann_foo')
+    folders.add_folder('bar', ann_id='ann_bar')
+    folders.add_item('bar', 'subbar', 'a', 'suba', ann_id='ann_bar')
+
+    # Make sure anonymous can't see them.
+    assert list(folders.parent_subfolders('a')) == []
+    assert list(folders.parent_subfolders(('a', 'suba'))) == []
+
+    assert list(folders.parent_subfolders('a', ann_id='ann_foo')) \
+        == [('foo', 'subfoo')]
+    assert list(folders.parent_subfolders(('a', 'suba'), ann_id='ann_bar')) \
+        == [('bar', 'subbar')]

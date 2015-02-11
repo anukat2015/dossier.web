@@ -40,11 +40,12 @@ class Folders(object):
     Folders cannot be deleted or modified.
 
     .. automethod:: __init__
+    .. automethod:: add_folder
+    .. automethod:: add_item
     .. automethod:: folders
     .. automethod:: subfolders
     .. automethod:: items
-    .. automethod:: add_folder
-    .. automethod:: add_item
+    .. automethod:: parent_subfolders
     '''
     DEFAULT_ANNOTATOR_ID = 'unknown'
 
@@ -94,6 +95,33 @@ class Folders(object):
             raise KeyError(folder_id)
         all_labels = self.label_store.directly_connected(folder_cid)
         return nub(la.subtopic_for(folder_cid) for la in all_labels)
+
+    def parent_subfolders(self, ident, ann_id=None):
+        '''An unordered generator of parent subfolders for ``ident``.
+
+        ``ident`` can either be a ``content_id`` or a tuple of
+        ``(content_id, subtopic_id)``.
+
+        Parent subfolders are limited to the annotator id given.
+
+        :param ident: identifier
+        :type ident: ``str`` or ``(str, str)``
+        :param str ann_id: Username
+        :rtype: generator of ``(folder_id, subfolder_id)``
+        '''
+        ann_id = self._annotator(ann_id)
+        cid, subid = normalize_ident(ident)
+        for lab in self.label_store.directly_connected(ident):
+            folder_cid = lab.other(cid)
+            subfolder_sid = lab.subtopic_for(folder_cid)
+            if not folder_cid.startswith('topic|'):
+                continue
+            folder = unwrap_folder_content_id(folder_cid)
+            subfolder = unwrap_subfolder_subtopic_id(subfolder_sid)
+            if folder['annotator_id'] != ann_id:
+                continue
+            yield (folder['folder_id'], subfolder)
+
 
     def items(self, folder_id, subfolder_id, ann_id=None):
         '''Yields an unodered generator of items in a subfolder.
@@ -237,3 +265,15 @@ def dedup(it):
         for lab in group:
             yield lab
             break
+
+
+def normalize_ident(ident):
+    '''Splits a generic identifier.
+
+    If ``ident`` is a tuple, then ``(ident[0], ident[1])`` is returned.
+    Otherwise, ``(ident[0], None)`` is returned.
+    '''
+    if isinstance(ident, tuple) and len(ident) == 2:
+        return ident[0], ident[1]  # content_id, subtopic_id
+    else:
+        return ident, None
