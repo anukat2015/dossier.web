@@ -148,7 +148,7 @@ class Folders(object):
 
         if self.store.get(folder_cid) is None:
             raise KeyError(folder_id)
-        for lab in self.label_store.connected_component(ident):
+        for lab in self.label_store.directly_connected(ident):
             cid = lab.other(folder_cid)
             subid = lab.subtopic_for(cid)
             yield (cid, subid)
