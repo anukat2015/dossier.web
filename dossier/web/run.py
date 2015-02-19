@@ -23,7 +23,7 @@ import yakonfig.factory
 from dossier.web import config, search_engines as builtin_engines
 from dossier.web.filter_preds import already_labeled
 from dossier.web.folder import Folders
-from dossier.web.routes import app
+from dossier.web.routes import BottleAppFixScriptName, app
 
 
 def get_application(routes=None, search_engines=None,
@@ -90,7 +90,7 @@ def get_application(routes=None, search_engines=None,
         add_routes(app)
 
     if web_conf.config.get('url_prefix') is not None:
-        root_app = bottle.Bottle()
+        root_app = BottleAppFixScriptName()
         root_app.mount(web_conf.config['url_prefix'], app)
         return args, root_app
     else:

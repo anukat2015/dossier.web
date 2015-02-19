@@ -86,7 +86,16 @@ from dossier.label.run import label_to_dict
 from dossier.web.search_engines import streaming_sample
 
 
-app = bottle.Bottle()
+class BottleAppFixScriptName(bottle.Bottle):
+    def __call__(self, env, start):
+        print('FIX CALLED!', env['SCRIPT_NAME'])
+        script_name = env.get('HTTP_X_SCRIPT_NAME')
+        if script_name is not None:
+            env['SCRIPT_NAME'] = script_name
+        return super(BottleAppFixScriptName, self).__call__(env, start)
+
+
+app = BottleAppFixScriptName()
 logger = logging.getLogger(__name__)
 web_static_path = path.join(path.split(__file__)[0], 'static')
 
@@ -189,7 +198,7 @@ def v1_search_engines(search_engines):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>', json=True)
-def v1_fc_get(visid_to_dbid, store, cid):
+def v1_fc_get(request, visid_to_dbid, store, cid):
     '''Retrieve a single feature collection.
 
     The route for this endpoint is:
