@@ -198,7 +198,7 @@ def v1_search_engines(search_engines):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>', json=True)
-def v1_fc_get(request, visid_to_dbid, store, cid):
+def v1_fc_get(visid_to_dbid, store, cid):
     '''Retrieve a single feature collection.
 
     The route for this endpoint is:
