@@ -88,8 +88,7 @@ from dossier.web.search_engines import streaming_sample
 
 class BottleAppFixScriptName(bottle.Bottle):
     def __call__(self, env, start):
-        print('FIX CALLED!', env['SCRIPT_NAME'])
-        script_name = env.get('HTTP_X_SCRIPT_NAME')
+        script_name = env.get('HTTP_DOSSIER_SCRIPT_NAME')
         if script_name is not None:
             env['SCRIPT_NAME'] = script_name
         return super(BottleAppFixScriptName, self).__call__(env, start)
