@@ -75,6 +75,7 @@ import json
 import logging
 import os
 import os.path as path
+import re
 import urllib
 import urlparse
 
@@ -146,22 +147,31 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
     filter_names = request.query.getall('filter') or ['already_labeled']
     request.query.pop('filter', None)  # remove from query dict
     try:
-        init_filter_preds = [filter_preds[n] for n in filter_names]
+        init_filter_preds = [(n, filter_preds[n]) for n in filter_names]
     except KeyError as e:
         bottle.abort(404,
             'Rank filter "%s" does not exist.' % e.message)
     search_engine = config.create(search_engine)
 
+
     filter_pred = lambda _: True
     if len(init_filter_preds) > 0:
-        preds = map(lambda p: config.create(p)(db_cid), init_filter_preds)
+        preds = []
+        for name, p in init_filter_preds:
+            kwargs = {}
+            for k in request.query.keys():
+                prefix = 'filter_' + name + '_'
+                if k.startswith(prefix):
+                    param_name = re.sub('^' + prefix, '', k)
+                    kwargs[param_name] = request.query.pop(k)
+            preds.append(config.create(p, **kwargs)(db_cid))
         filter_pred = lambda (db_cid, fc): all(p((db_cid, fc)) for p in preds)
 
-    kwargs = dict(request.query)
-    kwargs['filter_pred'] = filter_pred
-    kwargs['limit'] = str_to_max_int(request.query.get('limit'), 100)
+    search_kwargs = dict(request.query)
+    search_kwargs['filter_pred'] = filter_pred
+    search_kwargs['limit'] = str_to_max_int(request.query.get('limit'), 100)
 
-    results = search_engine(db_cid, **kwargs)
+    results = search_engine(db_cid, **search_kwargs)
     transformed = []
     for t in results['results']:
         if len(t) == 2:
