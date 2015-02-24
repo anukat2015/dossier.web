@@ -5,6 +5,7 @@ Foldering support using :mod:`dossier.store` and :mod:`dossier.label`
 '''
 from __future__ import absolute_import, division, print_function
 
+from collections import defaultdict
 from itertools import groupby, imap
 import logging
 import urllib
@@ -39,6 +40,8 @@ class Folders(object):
 
     Folders cannot be deleted or modified.
 
+    .. automethod:: id_to_name
+    .. automethod:: name_to_id
     .. automethod:: __init__
     .. automethod:: add_folder
     .. automethod:: add_item
@@ -48,6 +51,16 @@ class Folders(object):
     .. automethod:: parent_subfolders
     '''
     DEFAULT_ANNOTATOR_ID = 'unknown'
+
+    @staticmethod
+    def id_to_name(ident):
+        'Converts a folder id to a folder name.'
+        return ident.replace('_', ' ')
+
+    @staticmethod
+    def name_to_id(name):
+        'Converts a folder name to a folder id.'
+        return name.replace(' ', '_')
 
     def __init__(self, store, label_store):
         '''Create a new :class:`Folders` instance.
@@ -153,6 +166,25 @@ class Folders(object):
             subid = lab.subtopic_for(cid)
             yield (cid, subid)
 
+    def grouped_items(self, folder_id, subfolder_id, ann_id=None):
+        '''Returns a dictionary from content ids to subtopic ids.
+
+        Namely, the mapping is ``content_id |--> list of subtopic id``.
+
+        By default (with ``ann_id=None``), subfolders are shown for all
+        anonymous users. Optionally, ``ann_id`` can be set to a username,
+        which restricts the list to only subfolders owned by that user.
+
+        :param str folder_id: Folder id
+        :param str subfolder_id: Subfolder id
+        :param str ann_id: Username
+        :rtype: ``dict`` of ``content_id |--> [subtopic_id]``
+        '''
+        d = defaultdict(list)
+        for cid, subid in self.items(folder_id, subfolder_id, ann_id=ann_id):
+            d[cid].append(subid)
+        return d
+
     def add_folder(self, folder_id, ann_id=None):
         '''Add a folder.
 
@@ -210,14 +242,6 @@ class Folders(object):
 def assert_valid_folder_id(ident):
     if ' ' in ident or '/' in ident:
         raise ValueError("Folder ids cannot contain spaces or '/' characters.")
-
-
-def folder_id_to_name(ident):
-    return ident.replace('_', ' ')
-
-
-def folder_name_to_id(name):
-    return name.replace(' ', '_')
 
 
 def wrap_folder_content_id(annotator_id, fid):
