@@ -21,8 +21,14 @@ def random(store):
 
     This finds all content objects that have a matching name and
     returns ``limit`` results at random.
+
+    If there is no ``NAME`` index defined, then this always returns
+    no results.
     '''
     def _(content_id, filter_pred, limit):
+        if u'NAME' not in store.index_names():
+            return {'results': []}
+
         fc = store.get(content_id)
         if fc is None:
             raise KeyError(content_id)
