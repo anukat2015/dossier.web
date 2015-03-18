@@ -41,6 +41,9 @@ def get_application(routes=None, search_engines=None,
     There are several optional parameters that let you inject your own
     routes, search engines and rank filters into :mod:`dossier.web`.
 
+    In addition to `routes`, this will also import routes defined in the
+    `external_routes` list in the `dossier.web` config block.
+
     :param routes: Your own Bottle routes.
     :type routes: ``list`` of :class:`dossier.web.Route`
     :param search_engines: Your own search engines. If not present, a single
@@ -154,6 +157,11 @@ def configure_app(web_conf=None, search_engines=None,
             return new_res
         res.headers['Allow'] += ', OPTIONS'
         return bottle.request.app.default_error_handler(res)
+
+    for extroute in web_conf.config.get('external_routes', []):
+        mod, fun_name = extroute.split(':')
+        fun = getattr(__import__(mod, fromlist=[fun_name]), fun_name)
+        fun(app)
 
     return app
 
