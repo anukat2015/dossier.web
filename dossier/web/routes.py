@@ -461,9 +461,10 @@ def v1_subfolder_list(request, response, folders, fid):
     return sorted(folders.subfolders(fid, ann_id=ann_id))
 
 
+@app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>')
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
 def v1_subfolder_add(request, response, folders,
-                     visid_to_dbid, fid, sfid, cid, subid):
+                     visid_to_dbid, fid, sfid, cid, subid=None):
     '''Adds a subtopic to a subfolder for the current user.
 
     The route for this endpoint is:

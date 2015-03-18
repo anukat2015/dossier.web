@@ -123,7 +123,7 @@ class Folders(object):
         :rtype: generator of ``(folder_id, subfolder_id)``
         '''
         ann_id = self._annotator(ann_id)
-        cid, subid = normalize_ident(ident)
+        cid, _ = normalize_ident(ident)
         for lab in self.label_store.directly_connected(ident):
             folder_cid = lab.other(cid)
             subfolder_sid = lab.subtopic_for(folder_cid)
@@ -201,7 +201,7 @@ class Folders(object):
         self.store.put([(cid, FeatureCollection())])
         logger.info('Added folder %r with content id %r', folder_id, cid)
 
-    def add_item(self, folder_id, subfolder_id, content_id, subtopic_id,
+    def add_item(self, folder_id, subfolder_id, content_id, subtopic_id=None,
                  ann_id=None):
         '''Add an item to a subfolder.
 

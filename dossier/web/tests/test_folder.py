@@ -38,6 +38,13 @@ def test_subfolder_add(folders):
     assert list(folders.items('foo', 'subfoo')) == [('a', 'suba')]
 
 
+def test_subfolder_add_no_subtopic(folders):
+    folders.add_folder('foo')
+    folders.add_item('foo', 'subfoo', 'a')
+    assert list(folders.subfolders('foo')) == ['subfoo']
+    assert list(folders.items('foo', 'subfoo')) == [('a', '')]
+
+
 def test_subfolder_add_annotator(folders):
     folders.add_folder('foo', ann_id='ann_foo')
     folders.add_folder('bar', ann_id='ann_bar')
