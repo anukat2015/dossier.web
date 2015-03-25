@@ -55,12 +55,18 @@ class Folders(object):
     @staticmethod
     def id_to_name(ident):
         'Converts a folder id to a folder name.'
-        return ident.replace('_', ' ')
+        if ident is None:
+            return ident
+        else:
+            return ident.replace('_', ' ')
 
     @staticmethod
     def name_to_id(name):
         'Converts a folder name to a folder id.'
-        return name.replace(' ', '_')
+        if name is None:
+            return name
+        else:
+            return name.replace(' ', '_')
 
     def __init__(self, store, label_store):
         '''Create a new :class:`Folders` instance.
