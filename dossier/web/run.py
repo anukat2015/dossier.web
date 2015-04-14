@@ -142,8 +142,10 @@ def configure_app(web_conf=None, search_engines=None,
     @app.hook('after_request')
     def enable_cors():
         bottle.response.headers['Access-Control-Allow-Origin'] = '*'
-        bottle.response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+        bottle.response.headers['Access-Control-Allow-Methods'] = \
+            'GET, POST, PUT, DELETE, OPTIONS'
+        bottle.response.headers['Access-Control-Allow-Headers'] = \
+            'Origin, X-Requested-With, Content-Type, Accept, Authorization'
 
     @app.error(405)
     def method_not_allowed(res):
