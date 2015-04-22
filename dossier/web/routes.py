@@ -81,7 +81,7 @@ import urlparse
 
 import bottle
 
-from dossier.fc import FeatureCollection, StringCounter
+from dossier.fc import FeatureCollection, FeatureTokens, StringCounter
 from dossier.label import Label, CorefValue
 from dossier.label.run import label_to_dict
 from dossier.web.search_engines import streaming_sample
@@ -583,6 +583,8 @@ def fc_to_json(fc):
     for name, feat in fc.iteritems():
         if isinstance(feat, (unicode, StringCounter)):
             d[name] = feat
+        elif isinstance(feat, FeatureTokens):
+            d[name] = feat.to_dict()
     return d
 
 
