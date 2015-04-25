@@ -1,9 +1,12 @@
 '''dossier.web.filter_preds provides filter predicates.
 
 .. This software is released under an MIT/X11 open source license.
-   Copyright 2012-2014 Diffeo, Inc.
+   Copyright 2015 Diffeo, Inc.
 '''
 from __future__ import absolute_import, division, print_function
+
+from dossier.fc import FeatureCollection, StringCounter
+from dossier.metrics.pairwise import nilsimsa_max_similarity
 
 
 def already_labeled(label_store):
@@ -18,4 +21,49 @@ def already_labeled(label_store):
         def p((content_id, fc)):
             return content_id not in labeled_cids
         return p
+    return init_filter
+
+
+def near_duplicates(
+        label_store, store,
+        feature_name = 'nilsimsa_all',
+        kernel = nilsimsa_max_similarity,
+        threshold = 119 / 128,
+    ):
+    '''Filter results that are highly similar to the query FC or any FC
+    that was not filtered earlier in the stream.  "similarity" means
+    that the output of `kernel(fc1, fc2, feature_name)` is above
+    `threshold`.  These default to nilsimsa_max_similarity and
+    119/128.  `feature_name` defaults to 'nilsimsa_all'.
+
+    '''
+    def init_filter(query_content_id):
+
+        query_fc = store.get(query_content_id)
+        if feature_name in query_fc:
+            sim_feature = query_fc.get(feature_name)
+        else:
+            sim_feature = query_fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
+
+        if sim_feature:
+            accumulating_fc = FeatureCollection()
+            accumulating_fc[feature_name] = StringCounter()
+            accumulating_fc[feature_name].update(sim_feature)
+        else:
+            accumulating_fc = None
+
+        def accumulating_predicate((content_id, fc)):
+            if accumulating_fc is None:
+                # query_fc lacked sim_feature, so filter nothing
+                return False
+
+            similarity = kernel(fc, accumulating_fc, feature_name)
+            if similarity > threshold:
+                return False
+            else:
+                accumulating_fc[feature_name].update(fc[feature_name])
+                return True
+
+        return accumulating_predicate
+
     return init_filter

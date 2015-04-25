@@ -71,10 +71,11 @@ class SearchEngine(object):
         no results.
 
         ``filter_pred`` is a predicate that returns ``True`` given a
-        (``content_id``, :class:`dossier.fc.FeatureCollection`) if and
-        only if that object should appear in the results.  Typically,
-        this filtering predicate is used to make sure already labeled
-        feature collections don't re-appear.
+        (``content_id``, :class:`dossier.fc.FeatureCollection`) if
+        that object should be consider as a candidate to appear in the
+        results.  For example, a filtering predicate can ensure
+        already labeled feature collections do not appear again in the
+        results.
 
         ``limit`` is an integer that determines how many results the
         user wants to handle. Search engines may assume that this is
@@ -82,6 +83,7 @@ class SearchEngine(object):
 
         Finally, any additional query parameters in the URL are passed
         as keyword arguments, which will all be strings.
+
         '''
         pass
 
