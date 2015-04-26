@@ -9,7 +9,6 @@ from itertools import product
 import nilsimsa
 
 from dossier.fc import FeatureCollection, StringCounter
-from dossier.metrics.pairwise import nilsimsa_max_similarity
 
 
 def already_labeled(label_store):
