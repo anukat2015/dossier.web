@@ -24,6 +24,13 @@ def already_labeled(label_store):
     return init_filter
 
 
+def get_string_counter(fc, feature_name):
+    if feature_name not in fc:
+        return fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
+    else:
+        return fc.get(feature_name)
+
+
 def near_duplicates(
         label_store, store,
         feature_name = 'nilsimsa_all',
@@ -38,12 +45,8 @@ def near_duplicates(
 
     '''
     def init_filter(query_content_id):
-
         query_fc = store.get(query_content_id)
-        if feature_name in query_fc:
-            sim_feature = query_fc.get(feature_name)
-        else:
-            sim_feature = query_fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
+        sim_feature = get_string_counter(query_fc, feature_name)
 
         if sim_feature:
             accumulating_fc = FeatureCollection()
@@ -58,10 +61,10 @@ def near_duplicates(
                 return False
 
             similarity = kernel(fc, accumulating_fc, feature_name)
+            accumulating_fc[feature_name].update(get_string_counter(fc, feature_name))
             if similarity > threshold:
                 return False
             else:
-                accumulating_fc[feature_name].update(fc[feature_name])
                 return True
 
         return accumulating_predicate
