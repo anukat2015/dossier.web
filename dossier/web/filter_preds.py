@@ -74,11 +74,20 @@ def nilsimsa_near_duplicates(
     After refactoring to use nilsimsa directly in this function, the
     constant factors get better, and the order complexity is still
     linear in the number of items that the filter has emitted, because
-    it has to remember them and scan over them.
+    it has to remember them and scan over them.  Thresholding in the
+    nilsimsa.compare_digests function helps considerably: four times
+    faster on this synthetic test data when there are many different
+    documents, which is the typical case:
 
-    dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 1049 filtered to 49 in 0.162775 seconds, 6444.477004 per second
+    Without thresholding in the nilsimsa.compare_digests:
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 5049 filtered to 49 in 0.772274 seconds, 6537.834870 per second
+    dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 1049 filtered to 49 in 0.162775 seconds, 6444.477004 per second
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 209 filtered to 9 in 0.009348 seconds, 22357.355097 per second
+
+    With thresholding in the nilsimsa.compare_digests:
+    dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 5049 filtered to 49 in 0.249705 seconds, 20219.853262 per second
+    dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 1549 filtered to 49 in 0.112724 seconds, 13741.549025 per second
+    dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 209 filtered to 9 in 0.009230 seconds, 22643.802754 per second
 
     '''
     def init_filter(query_content_id):
@@ -101,7 +110,7 @@ def nilsimsa_near_duplicates(
                     return False
 
             for hash1, hash2 in product(sim_feature, accumulator):
-                score = nilsimsa.compare_digests(hash1, hash2)
+                score = nilsimsa.compare_digests(hash1, hash2, threshold=threshold)
                 if score > threshold:
                     ## near duplicate, so filter and do not accumulate
                     return False

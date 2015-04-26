@@ -119,7 +119,9 @@ def test_nilsimsa_near_duplicates_update_logic(label_store, store):
     assert len(results) == 3
 
 
-def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=10, num_exact_dups_each=10, num_near_dups_each=10):
+## speed perf numbers in nilsimsa_near_duplicates doc string come from
+## hand editing the kwargs in this:
+def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=5, num_exact_dups_each=10, num_near_dups_each=10):
 
     different_texts = [random_text() for _ in range(num_texts)]
 

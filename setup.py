@@ -45,7 +45,7 @@ setup(
         'dossier.store >= 0.3.1',
         'kvlayer >= 0.4.14',
         'pytest',
-        'nilsimsa',
+        'nilsimsa >= 0.3.4',
         'uwsgi >= 2',
         'yakonfig >= 0.7.2',
     ],
