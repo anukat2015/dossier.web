@@ -60,7 +60,7 @@ def near_duplicates(
                 # query_fc lacked sim_feature, so filter nothing
                 return False
 
-            similarity = kernel(fc, accumulating_fc, feature_name)
+            similarity = kernel(fc, accumulating_fc, feature_name, threshold=threshold)
             accumulating_fc[feature_name].update(get_string_counter(fc, feature_name))
             if similarity > threshold:
                 return False

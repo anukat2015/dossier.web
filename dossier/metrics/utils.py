@@ -12,7 +12,7 @@ def require_string_counters(kernel):
     '''decorator for kernels that require StringCounter features.
 
     '''
-    def get_string_counters(fc1, fc2, feature_name, feature_name_other=None):
+    def get_string_counters(fc1, fc2, feature_name, feature_name_other=None, **kwargs):
         if feature_name_other is None:
             feature_name_other = feature_name
 
@@ -30,7 +30,7 @@ def require_string_counters(kernel):
         if not (f1 and f2):
             return 0.
 
-        return kernel(f1, f2)
+        return kernel(f1, f2, **kwargs)
 
     return get_string_counters
 
