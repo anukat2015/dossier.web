@@ -26,6 +26,14 @@ def already_labeled(label_store):
     return init_filter
 
 
+def get_query_fc(store, query_content_id):
+    '''Called by nilsimsa_near_duplicates to get the query_fc; can be
+    monkey patched to change how the query_fc is obtained.
+
+    '''
+    return store.get(query_content_id)
+
+
 def get_string_counter(fc, feature_name):
     '''Find and return a :class:`~dossier.fc.StringCounter` at
     `feature_name` or at `DISPLAY_PREFIX` + `feature_name` in the
@@ -90,7 +98,7 @@ def nilsimsa_near_duplicates(
 
     '''
     def init_filter(query_content_id):
-        query_fc = store.get(query_content_id)
+        query_fc = get_query_fc(store, query_content_id)
         sim_feature = get_string_counter(query_fc, nilsimsa_feature_name)
 
         accumulator = dict()
