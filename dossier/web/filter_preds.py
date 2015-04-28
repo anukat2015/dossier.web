@@ -109,6 +109,9 @@ def nilsimsa_near_duplicates(
         def accumulating_predicate((content_id, fc)):
 
             sim_feature = get_string_counter(fc, nilsimsa_feature_name)
+            if not sim_feature:
+                return True
+
             for nhash in sim_feature:
                 if nhash in accumulator:
                     ## either exact duplicate, or darn close (see
