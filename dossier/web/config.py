@@ -128,15 +128,6 @@ class Config(yakonfig.factory.AutoFactory):
         '''Return a thread local ``kvlayer`` client.'''
         if self._kvlclient is None:
             self._kvlclient = kvlayer.client()
-
-            # This seems pretty leaky. Why does dossier.web care about
-            # the table schema of `stream_items`?
-            # It's OK, dossier.web won't be serving stream items in the
-            # future.
-            self._kvlclient.setup_namespace({
-                'stream_items': 2,
-                'stream_items_doc_id_epoch_ticks': 2,
-            })
         return self._kvlclient
 
 
