@@ -11,9 +11,19 @@ def folders(store, label_store):
     yield Folders(store, label_store)
 
 
+@pytest.yield_fixture
+def folders_prefix(store, label_store):
+    yield Folders(store, label_store, prefix='foo')
+
+
 def test_folder_add(folders):
     folders.add_folder('foo_bar')
     assert list(folders.folders()) == ['foo_bar']
+
+
+def test_folder_add_prefix(folders_prefix):
+    folders_prefix.add_folder('foo_bar')
+    assert list(folders_prefix.folders()) == ['foo_bar']
 
 
 def test_folder_add_annotator(folders):
@@ -36,6 +46,13 @@ def test_subfolder_add(folders):
     folders.add_item('foo', 'subfoo', 'a', 'suba')
     assert list(folders.subfolders('foo')) == ['subfoo']
     assert list(folders.items('foo', 'subfoo')) == [('a', 'suba')]
+
+
+def test_subfolder_add_prefix(folders_prefix):
+    folders_prefix.add_folder('foo')
+    folders_prefix.add_item('foo', 'subfoo', 'a', 'suba')
+    assert list(folders_prefix.subfolders('foo')) == ['subfoo']
+    assert list(folders_prefix.items('foo', 'subfoo')) == [('a', 'suba')]
 
 
 def test_subfolder_add_no_subtopic(folders):

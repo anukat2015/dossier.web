@@ -122,8 +122,7 @@ def configure_app(web_conf=None, search_engines=None,
     app.install(
         config.create_injector('label_store', lambda: web_conf.label_store))
     app.install(
-        config.create_injector(
-            'folders', lambda: Folders(web_conf.store, web_conf.label_store)))
+        config.create_injector('folders', lambda: web_conf.folders))
     app.install(
         config.create_injector('search_engines', lambda: search_engines))
     app.install(

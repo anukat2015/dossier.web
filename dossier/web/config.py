@@ -15,6 +15,7 @@ import bottle
 
 from dossier.label import LabelStore
 from dossier.store import Store
+from dossier.web.folder import Folders
 import kvlayer
 import yakonfig
 import yakonfig.factory
@@ -68,9 +69,10 @@ class Config(yakonfig.factory.AutoFactory):
     .. autoattribute:: dossier.web.Config.store
     .. autoattribute:: dossier.web.Config.label_store
     '''
-    _store = thread_local_property('store')
-    _label_store = thread_local_property('label_store')
-    _kvlclient = thread_local_property('kvlclient')
+    _THREAD_LOCALS = ['folders', 'store', 'label_store', 'kvlclient']
+    for n in _THREAD_LOCALS:
+        locals()['_' + n] = thread_local_property(n)
+
 
     def __init__(self, *args, **kwargs):
         super(Config, self).__init__(*args, **kwargs)
@@ -78,7 +80,7 @@ class Config(yakonfig.factory.AutoFactory):
 
         # Create new thread local containers for values that cannot be used
         # simultaneously across threads.
-        for n in ('store', 'label_store', 'kvlclient'):
+        for n in self._THREAD_LOCALS:
             setattr(self, '_thread_local_' + n, threading.local())
 
     def new_config(self):
@@ -99,13 +101,19 @@ class Config(yakonfig.factory.AutoFactory):
 
     @property
     @safe_service('_store')
+    def folders(self):
+        '''Return a thread local :class:`dossier.web.Folders` client.'''
+        if self._folders is None:
+            config = global_config('dossier.folders')
+            self._folders = self.create(Folders, config=config)
+        return self._folders
+
+    @property
+    @safe_service('_store')
     def store(self):
         '''Return a thread local :class:`dossier.store.Store` client.'''
         if self._store is None:
-            try:
-                config = yakonfig.get_global_config('dossier.store')
-            except KeyError:
-                config = {}
+            config = global_config('dossier.store')
             self._store = self.create(Store, config=config)
         return self._store
 
@@ -114,10 +122,7 @@ class Config(yakonfig.factory.AutoFactory):
     def label_store(self):
         '''Return a thread local :class:`dossier.label.LabelStore` client.'''
         if self._label_store is None:
-            try:
-                config = yakonfig.get_global_config('dossier.label')
-            except KeyError:
-                config = {}
+            config = global_config('dossier.label')
             if 'kvlayer' in config:
                 kvl = kvlayer.client(config=config['kvlayer'])
                 self._label_store = LabelStore(kvl)
@@ -189,3 +194,10 @@ class JsonPlugin(object):
             bottle.response.content_type = 'application/json'
             return json.dumps(callback(*args, **kwargs), indent=2)
         return _
+
+
+def global_config(name):
+    try:
+        return yakonfig.get_global_config(name)
+    except KeyError:
+        return {}

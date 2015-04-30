@@ -68,17 +68,20 @@ class Folders(object):
         else:
             return name.replace(' ', '_')
 
-    def __init__(self, store, label_store):
+    def __init__(self, store, label_store, prefix=''):
         '''Create a new :class:`Folders` instance.
 
         :param store: An FC store
         :type store: :class:`dossier.store.Store`
         :param label_store: A label store
         :type label_store: :class:`dossier.label.LabelStore`
+        :param prefix: A folder id prefix
+        :type prefix: unicode
         :rtype: :class:`Folders`
         '''
         self.store = store
         self.label_store = label_store
+        self.prefix = prefix.encode('utf-8')
 
     def folders(self, ann_id=None):
         '''Yields an unordered generator for all available folders.
@@ -91,7 +94,11 @@ class Folders(object):
         :rtype: generator of folder_id
         '''
         ann_id = self._annotator(ann_id)
-        prefix = '|'.join(['topic', ann_id, ''])
+        if len(self.prefix) > 0:
+            prefix = '|'.join([urllib.quote(self.prefix, safe='~'),
+                               'topic', ann_id, ''])
+        else:
+            prefix = '|'.join(['topic', ann_id, ''])
         logger.info('Scanning for folders with prefix %r', prefix)
         return imap(lambda cid: unwrap_folder_content_id(cid)['folder_id'],
                     self.store.scan_prefix_ids(prefix))
@@ -109,7 +116,8 @@ class Folders(object):
         '''
         assert_valid_folder_id(folder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id)
+        folder_cid = wrap_folder_content_id(ann_id, folder_id,
+                                            prefix=self.prefix)
         if self.store.get(folder_cid) is None:
             raise KeyError(folder_id)
         all_labels = self.label_store.directly_connected(folder_cid)
@@ -161,7 +169,8 @@ class Folders(object):
         assert_valid_folder_id(folder_id)
         assert_valid_folder_id(subfolder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id)
+        folder_cid = wrap_folder_content_id(ann_id, folder_id,
+                                            prefix=self.prefix)
         subfolder_sid = wrap_subfolder_subtopic_id(subfolder_id)
         ident = (folder_cid, subfolder_sid)
 
@@ -203,7 +212,7 @@ class Folders(object):
         '''
         assert_valid_folder_id(folder_id)
         ann_id = self._annotator(ann_id)
-        cid = wrap_folder_content_id(ann_id, folder_id)
+        cid = wrap_folder_content_id(ann_id, folder_id, prefix=self.prefix)
         self.store.put([(cid, FeatureCollection())])
         logger.info('Added folder %r with content id %r', folder_id, cid)
 
@@ -227,7 +236,8 @@ class Folders(object):
         assert_valid_folder_id(folder_id)
         assert_valid_folder_id(subfolder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id)
+        folder_cid = wrap_folder_content_id(ann_id, folder_id,
+                                            prefix=self.prefix)
         subfolder_sid = wrap_subfolder_subtopic_id(subfolder_id)
 
         if self.store.get(folder_cid) is None:
@@ -250,16 +260,23 @@ def assert_valid_folder_id(ident):
         raise ValueError("Folder ids cannot contain spaces or '/' characters.")
 
 
-def wrap_folder_content_id(annotator_id, fid):
-    return '|'.join([
+def wrap_folder_content_id(annotator_id, fid, prefix=''):
+    prefix = urllib.quote(prefix, safe='~')
+    parts = [prefix] if len(prefix) > 0 else []
+    parts.extend([
         'topic',
         urllib.quote(annotator_id, safe='~'),
         urllib.quote(fid, safe='~'),
     ])
+    return '|'.join(parts)
 
 
 def unwrap_folder_content_id(cid):
-    _, annotator_id, fid = cid.split('|')
+    parts = cid.split('|')
+    if len(parts) == 3:
+        _, annotator_id, fid = parts
+    else:
+        _, _, annotator_id, fid = parts
     return {
         'annotator_id': urllib.unquote(annotator_id),
         'folder_id': urllib.unquote(fid),

@@ -8,6 +8,22 @@ import kvlayer
 import yakonfig
 
 
+def test_folder_prefix():
+    config = {
+        'dossier.folders': {
+            'prefix': 'foo',
+        },
+        'kvlayer': {
+            'storage_type': 'local',
+            'app_name': 'folder_prefix',
+            'namespace': 'a',
+        },
+    }
+    with yakonfig.defaulted_config([kvlayer], config=config):
+        conf = Config(config=config)
+        assert conf.folders.prefix == 'foo'
+
+
 def test_same_conns():
     config = {
         'dossier.label': {},
