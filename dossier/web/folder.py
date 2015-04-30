@@ -100,7 +100,7 @@ class Folders(object):
         else:
             prefix = '|'.join(['topic', ann_id, ''])
         logger.info('Scanning for folders with prefix %r', prefix)
-        return imap(lambda cid: unwrap_folder_content_id(cid)['folder_id'],
+        return imap(lambda id: self.unwrap_folder_content_id(id)['folder_id'],
                     self.store.scan_prefix_ids(prefix))
 
     def subfolders(self, folder_id, ann_id=None):
@@ -114,10 +114,9 @@ class Folders(object):
         :param str ann_id: Username
         :rtype: generator of subfolder_id
         '''
-        assert_valid_folder_id(folder_id)
+        self.assert_valid_folder_id(folder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id,
-                                            prefix=self.prefix)
+        folder_cid = self.wrap_folder_content_id(ann_id, folder_id)
         if self.store.get(folder_cid) is None:
             raise KeyError(folder_id)
         all_labels = self.label_store.directly_connected(folder_cid)
@@ -143,8 +142,8 @@ class Folders(object):
             subfolder_sid = lab.subtopic_for(folder_cid)
             if not folder_cid.startswith('topic|'):
                 continue
-            folder = unwrap_folder_content_id(folder_cid)
-            subfolder = unwrap_subfolder_subtopic_id(subfolder_sid)
+            folder = self.unwrap_folder_content_id(folder_cid)
+            subfolder = self.unwrap_subfolder_subtopic_id(subfolder_sid)
             if folder['annotator_id'] != ann_id:
                 continue
             yield (folder['folder_id'], subfolder)
@@ -166,12 +165,11 @@ class Folders(object):
         :param str ann_id: Username
         :rtype: generator of ``(content_id, subtopic_id)``
         '''
-        assert_valid_folder_id(folder_id)
-        assert_valid_folder_id(subfolder_id)
+        self.assert_valid_folder_id(folder_id)
+        self.assert_valid_folder_id(subfolder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id,
-                                            prefix=self.prefix)
-        subfolder_sid = wrap_subfolder_subtopic_id(subfolder_id)
+        folder_cid = self.wrap_folder_content_id(ann_id, folder_id)
+        subfolder_sid = self.wrap_subfolder_subtopic_id(subfolder_id)
         ident = (folder_cid, subfolder_sid)
 
         if self.store.get(folder_cid) is None:
@@ -210,9 +208,9 @@ class Folders(object):
         :param str folder_id: Folder id
         :param str ann_id: Username
         '''
-        assert_valid_folder_id(folder_id)
+        self.assert_valid_folder_id(folder_id)
         ann_id = self._annotator(ann_id)
-        cid = wrap_folder_content_id(ann_id, folder_id, prefix=self.prefix)
+        cid = self.wrap_folder_content_id(ann_id, folder_id)
         self.store.put([(cid, FeatureCollection())])
         logger.info('Added folder %r with content id %r', folder_id, cid)
 
@@ -233,12 +231,11 @@ class Folders(object):
         :param str subtopic_id: subtopic identifier
         :param str ann_id: Username
         '''
-        assert_valid_folder_id(folder_id)
-        assert_valid_folder_id(subfolder_id)
+        self.assert_valid_folder_id(folder_id)
+        self.assert_valid_folder_id(subfolder_id)
         ann_id = self._annotator(ann_id)
-        folder_cid = wrap_folder_content_id(ann_id, folder_id,
-                                            prefix=self.prefix)
-        subfolder_sid = wrap_subfolder_subtopic_id(subfolder_id)
+        folder_cid = self.wrap_folder_content_id(ann_id, folder_id)
+        subfolder_sid = self.wrap_subfolder_subtopic_id(subfolder_id)
 
         if self.store.get(folder_cid) is None:
             raise KeyError(folder_id)
@@ -255,40 +252,40 @@ class Folders(object):
         return self.DEFAULT_ANNOTATOR_ID if ann_id is None else ann_id
 
 
-def assert_valid_folder_id(ident):
-    if ' ' in ident or '/' in ident:
-        raise ValueError("Folder ids cannot contain spaces or '/' characters.")
+    def assert_valid_folder_id(self, ident):
+        if ' ' in ident or '/' in ident:
+            raise ValueError("Folder ids cannot contain spaces or '/' characters.")
 
 
-def wrap_folder_content_id(annotator_id, fid, prefix=''):
-    prefix = urllib.quote(prefix, safe='~')
-    parts = [prefix] if len(prefix) > 0 else []
-    parts.extend([
-        'topic',
-        urllib.quote(annotator_id, safe='~'),
-        urllib.quote(fid, safe='~'),
-    ])
-    return '|'.join(parts)
+    def wrap_folder_content_id(self, annotator_id, fid):
+        prefix = urllib.quote(self.prefix, safe='~')
+        parts = [prefix] if len(prefix) > 0 else []
+        parts.extend([
+            'topic',
+            urllib.quote(annotator_id, safe='~'),
+            urllib.quote(fid, safe='~'),
+        ])
+        return '|'.join(parts)
 
 
-def unwrap_folder_content_id(cid):
-    parts = cid.split('|')
-    if len(parts) == 3:
-        _, annotator_id, fid = parts
-    else:
-        _, _, annotator_id, fid = parts
-    return {
-        'annotator_id': urllib.unquote(annotator_id),
-        'folder_id': urllib.unquote(fid),
-    }
+    def unwrap_folder_content_id(self, cid):
+        parts = cid.split('|')
+        if len(parts) == 3:
+            _, annotator_id, fid = parts
+        else:
+            _, _, annotator_id, fid = parts
+        return {
+            'annotator_id': urllib.unquote(annotator_id),
+            'folder_id': urllib.unquote(fid),
+        }
 
 
-def wrap_subfolder_subtopic_id(sfid):
-    return sfid
+    def wrap_subfolder_subtopic_id(self, sfid):
+        return sfid
 
 
-def unwrap_subfolder_subtopic_id(subtopic_id):
-    return subtopic_id
+    def unwrap_subfolder_subtopic_id(self, subtopic_id):
+        return subtopic_id
 
 
 def nub(it):

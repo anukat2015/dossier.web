@@ -534,30 +534,6 @@ def folder_name_to_id(name):
     return name.replace(' ', '_')
 
 
-def wrap_folder_content_id(annotator_id, fid):
-    return '|'.join([
-        'topic',
-        urllib.quote(annotator_id, safe='~'),
-        urllib.quote(fid, safe='~'),
-    ])
-
-
-def unwrap_folder_content_id(cid):
-    _, annotator_id, fid = cid.split('|')
-    return {
-        'annotator_id': urllib.unquote(annotator_id),
-        'folder_id': urllib.unquote(fid),
-    }
-
-
-def wrap_subfolder_subtopic_id(sfid):
-    return sfid
-
-
-def unwrap_subfolder_subtopic_id(subtopic_id):
-    return subtopic_id
-
-
 def assert_valid_folder_id(ident):
     if ' ' in ident or '/' in ident:
         bottle.abort(500,
