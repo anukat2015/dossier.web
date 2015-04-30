@@ -251,11 +251,9 @@ class Folders(object):
         '''Returns the default annotator iff ``ann_id is None``.'''
         return self.DEFAULT_ANNOTATOR_ID if ann_id is None else ann_id
 
-
     def assert_valid_folder_id(self, ident):
         if ' ' in ident or '/' in ident:
             raise ValueError("Folder ids cannot contain spaces or '/' characters.")
-
 
     def wrap_folder_content_id(self, annotator_id, fid):
         prefix = urllib.quote(self.prefix, safe='~')
@@ -266,7 +264,6 @@ class Folders(object):
             urllib.quote(fid, safe='~'),
         ])
         return '|'.join(parts)
-
 
     def unwrap_folder_content_id(self, cid):
         parts = cid.split('|')
@@ -279,10 +276,8 @@ class Folders(object):
             'folder_id': urllib.unquote(fid),
         }
 
-
     def wrap_subfolder_subtopic_id(self, sfid):
         return sfid
-
 
     def unwrap_subfolder_subtopic_id(self, subtopic_id):
         return subtopic_id
