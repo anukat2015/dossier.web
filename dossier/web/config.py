@@ -47,16 +47,16 @@ def safe_service(attr, default_value=None):
     return _
 
 
-def thread_local_property():
+def thread_local_property(name):
     '''Creates a thread local ``property``.'''
-    tlocal = threading.local()
+    name = '_thread_local_' + name
     def fget(self):
         try:
-            return tlocal.value
+            return getattr(self, name).value
         except AttributeError:
             return None
     def fset(self, value):
-        tlocal.value = value
+        getattr(self, name).value = value
     return property(fget=fget, fset=fset)
 
 
@@ -68,13 +68,18 @@ class Config(yakonfig.factory.AutoFactory):
     .. autoattribute:: dossier.web.Config.store
     .. autoattribute:: dossier.web.Config.label_store
     '''
-    _store = thread_local_property()
-    _label_store = thread_local_property()
-    _kvlclient = thread_local_property()
+    _store = thread_local_property('store')
+    _label_store = thread_local_property('label_store')
+    _kvlclient = thread_local_property('kvlclient')
 
     def __init__(self, *args, **kwargs):
         super(Config, self).__init__(*args, **kwargs)
         self.new_config()
+
+        # Create new thread local containers for values that cannot be used
+        # simultaneously across threads.
+        for n in ('store', 'label_store', 'kvlclient'):
+            setattr(self, '_thread_local_' + n, threading.local())
 
     def new_config(self):
         super(Config, self).new_config()
@@ -97,9 +102,6 @@ class Config(yakonfig.factory.AutoFactory):
     def store(self):
         '''Return a thread local :class:`dossier.store.Store` client.'''
         if self._store is None:
-            # This is a bit of a cheat, but I'm not sure of a better way.
-            # At the very least, this is inside a class called ``Config``...
-            # ---AG
             try:
                 config = yakonfig.get_global_config('dossier.store')
             except KeyError:
@@ -112,14 +114,15 @@ class Config(yakonfig.factory.AutoFactory):
     def label_store(self):
         '''Return a thread local :class:`dossier.label.LabelStore` client.'''
         if self._label_store is None:
-            # This is a bit of a cheat, but I'm not sure of a better way.
-            # At the very least, this is inside a class called ``Config``...
-            # ---AG
             try:
                 config = yakonfig.get_global_config('dossier.label')
             except KeyError:
                 config = {}
-            self._label_store = self.create(LabelStore, config=config)
+            if 'kvlayer' in config:
+                kvl = kvlayer.client(config=config['kvlayer'])
+                self._label_store = LabelStore(kvl)
+            else:
+                self._label_store = self.create(LabelStore, config=config)
         return self._label_store
 
     @property
