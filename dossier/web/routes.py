@@ -498,11 +498,11 @@ def v1_subfolder_add(request, response, kvlclient,
     ``annotator_id`` query parameter.)
     '''
     if subid is not None:
-        assert '|' not in subid
+        assert '@' not in subid
     path = [
         urllib.unquote(fid),
         urllib.unquote(sfid),
-        cid + (('|' + subid) if subid is not None else ''),
+        cid + (('@' + subid) if subid is not None else ''),
     ]
     path = '/'.join(path)
     new_folders(kvlclient, request).put(path)
@@ -527,8 +527,8 @@ def v1_subtopic_list(request, response, kvlclient, fid, sfid):
     try:
         items = []
         for it in new_folders(kvlclient, request).list(path):
-            if '|' in it.name:
-                items.append(it.name.split('|'))
+            if '@' in it.name:
+                items.append(it.name.split('@'))
             else:
                 items.append((it.name, None))
         return items
@@ -580,7 +580,7 @@ def make_path(fid, sfid=None, cid=None, subid=None):
         path.append(urllib.unquote(sfid))
         if cid is not None:
             if subid is not None:
-                path.append(cid + '|' + subid)
+                path.append(cid + '@' + subid)
             else:
                 path.append(cid)
     return '/'.join(path)
