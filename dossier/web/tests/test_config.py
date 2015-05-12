@@ -1,13 +1,15 @@
 from __future__ import absolute_import, division, print_function
 
+import pytest
+
 from dossier.fc import FeatureCollection
 from dossier.store import Store
 from dossier.web.config import Config
-
 import kvlayer
 import yakonfig
 
 
+@pytest.mark.xfail  # Foldering is no longer configured with `Config`. ---AG
 def test_folder_prefix():
     config = {
         'dossier.folders': {

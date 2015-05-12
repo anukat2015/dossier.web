@@ -15,7 +15,6 @@ import bottle
 
 from dossier.label import LabelStore
 from dossier.store import Store
-from dossier.web.folder import Folders
 import kvlayer
 import yakonfig
 import yakonfig.factory
@@ -69,7 +68,7 @@ class Config(yakonfig.factory.AutoFactory):
     .. autoattribute:: dossier.web.Config.store
     .. autoattribute:: dossier.web.Config.label_store
     '''
-    _THREAD_LOCALS = ['folders', 'store', 'label_store', 'kvlclient']
+    _THREAD_LOCALS = ['store', 'label_store', 'kvlclient']
     for n in _THREAD_LOCALS:
         locals()['_' + n] = thread_local_property(n)
 
@@ -98,15 +97,6 @@ class Config(yakonfig.factory.AutoFactory):
     @property
     def auto_config(self):
         return [Store, LabelStore]
-
-    @property
-    @safe_service('_store')
-    def folders(self):
-        '''Return a thread local :class:`dossier.web.Folders` client.'''
-        if self._folders is None:
-            config = global_config('dossier.folders')
-            self._folders = self.create(Folders, config=config)
-        return self._folders
 
     @property
     @safe_service('_store')

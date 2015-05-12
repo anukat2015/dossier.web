@@ -70,9 +70,10 @@ folder or sub-folder.)
 '''
 from __future__ import absolute_import, division, print_function
 from functools import partial
-from itertools import groupby, imap, islice
+from itertools import groupby, imap, ifilter, islice
 import json
 import logging
+from operator import attrgetter
 import os
 import os.path as path
 import re
@@ -80,11 +81,14 @@ import urllib
 import urlparse
 
 import bottle
+import cbor
 
 from dossier.fc import FeatureCollection, FeatureTokens, StringCounter
 from dossier.label import Label, CorefValue
 from dossier.label.run import label_to_dict
+from dossier.web.folder import Folders
 from dossier.web.search_engines import streaming_sample
+import yakonfig
 
 
 class BottleAppFixScriptName(bottle.Bottle):
@@ -416,7 +420,7 @@ def v1_label_negative_inference(request, response,
 
 
 @app.get('/dossier/v1/folder', json=True)
-def v1_folder_list(request, folders):
+def v1_folder_list(request, kvlclient):
     '''Retrieves a list of folders for the current user.
 
     The route for this endpoint is: ``GET /dossier/v1/folder``.
@@ -426,11 +430,13 @@ def v1_folder_list(request, folders):
 
     The payload returned is a list of folder identifiers.
     '''
-    return sorted(folders.folders(ann_id=request.query.get('annotator_id')))
+    return sorted(imap(attrgetter('name'),
+                       ifilter(lambda it: it.is_folder(),
+                               new_folders(kvlclient, request).list('/'))))
 
 
 @app.put('/dossier/v1/folder/<fid>')
-def v1_folder_add(request, response, folders, fid):
+def v1_folder_add(request, response, kvlclient, fid):
     '''Adds a folder belonging to the current user.
 
     The route for this endpoint is: ``PUT /dossier/v1/folder/<fid>``.
@@ -440,13 +446,13 @@ def v1_folder_add(request, response, folders, fid):
     (Temporarily, the "current user" can be set via the
     ``annotator_id`` query parameter.)
     '''
-    ann_id = request.query.get('annotator_id')
-    folders.add_folder(fid, ann_id=ann_id)
+    fid = urllib.unquote(fid)
+    new_folders(kvlclient, request).put_folder(fid)
     response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder', json=True)
-def v1_subfolder_list(request, response, folders, fid):
+def v1_subfolder_list(request, response, kvlclient, fid):
     '''Retrieves a list of subfolders in a folder for the current user.
 
     The route for this endpoint is:
@@ -457,14 +463,20 @@ def v1_subfolder_list(request, response, folders, fid):
 
     The payload returned is a list of subfolder identifiers.
     '''
-    ann_id = request.query.get('annotator_id')
-    return sorted(folders.subfolders(fid, ann_id=ann_id))
+    fid = urllib.unquote(fid)
+    try:
+        return sorted(imap(attrgetter('name'),
+                           ifilter(lambda it: it.is_folder(),
+                                   new_folders(kvlclient, request).list(fid))))
+    except KeyError:
+        response.status = 404
+        return []
 
 
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>')
 @app.put('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
-def v1_subfolder_add(request, response, folders,
-                     visid_to_dbid, fid, sfid, cid, subid=None):
+def v1_subfolder_add(request, response, kvlclient,
+                     fid, sfid, cid, subid=None):
     '''Adds a subtopic to a subfolder for the current user.
 
     The route for this endpoint is:
@@ -485,13 +497,20 @@ def v1_subfolder_add(request, response, folders,
     (Temporarily, the "current user" can be set via the
     ``annotator_id`` query parameter.)
     '''
-    ann_id = request.query.get('annotator_id')
-    folders.add_item(fid, sfid, visid_to_dbid(cid), subid, ann_id=ann_id)
+    if subid is not None:
+        assert '|' not in subid
+    path = [
+        urllib.unquote(fid),
+        urllib.unquote(sfid),
+        cid + (('|' + subid) if subid is not None else ''),
+    ]
+    path = '/'.join(path)
+    new_folders(kvlclient, request).put(path)
     response.status = 201
 
 
 @app.get('/dossier/v1/folder/<fid>/subfolder/<sfid>', json=True)
-def v1_subtopic_list(request, folders, dbid_to_visid, fid, sfid):
+def v1_subtopic_list(request, response, kvlclient, fid, sfid):
     '''Retrieves a list of items in a subfolder.
 
     The route for this endpoint is:
@@ -504,27 +523,67 @@ def v1_subtopic_list(request, folders, dbid_to_visid, fid, sfid):
     element in the array is the item's content id and the second
     element is the item's subtopic id.
     '''
-    ann_id = request.query.get('annotator_id')
-    items = folders.items(fid, sfid, ann_id=ann_id)
-    return sorted((dbid_to_visid(cid), subid) for cid, subid in items)
+    path = urllib.unquote(fid) + '/' + urllib.unquote(sfid)
+    try:
+        items = []
+        for it in new_folders(kvlclient, request).list(path):
+            if '|' in it.name:
+                items.append(it.name.split('|'))
+            else:
+                items.append((it.name, None))
+        return items
+    except KeyError:
+        response.status = 404
+        return []
+
+
+@app.delete('/dossier/v1/folder/<fid>')
+@app.delete('/dossier/v1/folder/<fid>/subfolder/<sfid>')
+@app.delete('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>')
+@app.delete('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
+def v1_folder_delete(request, response, kvlclient,
+                     fid, sfid=None, cid=None, subid=None):
+    new_folders(kvlclient, request).delete(make_path(fid, sfid, cid, subid))
+    response.status = 200
+
+
+@app.post('/dossier/v1/folder/<fid_src>/rename/<fid_dest>')
+@app.post('/dossier/v1/folder/<fid_src>/subfolder/<sfid_src>/rename/<fid_dest>/subfolder/<sfid_dest>')
+def v1_folder_rename(request, response, kvlclient,
+                     fid_src, fid_dest, sfid_src=None, sfid_dest=None):
+    src, dest = make_path(fid_src, sfid_src), make_path(fid_dest, sfid_dest)
+    new_folders(kvlclient, request).move(src, dest)
+    response.status = 200
 
 
 if os.getenv('DOSSIER_WEB_DEV', '0') == '1':
-    @app.delete('/dossier/v1/delete-all-labels')
-    def v1_delete_all_labels(response, store, label_store):
-        label_store.delete_all()
-        # Since the foldering system relies on the FC table for determining
-        # folders, we need to delete those too. (But we otherwise leave all
-        # FCs alone.)
-        for cid in store.scan_prefix_ids('topic|'):
-            store.delete(cid)
-        response.status = 204
+    # This is bunk now. Replace with foldering calls?
+    # @app.delete('/dossier/v1/delete-all-labels')
+    # def v1_delete_all_labels(response, store, label_store):
+        # label_store.delete_all()
+        # # Since the foldering system relies on the FC table for determining
+        # # folders, we need to delete those too. (But we otherwise leave all
+        # # FCs alone.)
+        # for cid in store.scan_prefix_ids('topic|'):
+            # store.delete(cid)
+        # response.status = 204
 
     @app.delete('/dossier/v1/delete-all-fcs')
     def v1_delete_all_fcs(response, store):
         store.delete_all()
         response.status = 204
 
+
+def make_path(fid, sfid=None, cid=None, subid=None):
+    path = [urllib.unquote(fid)]
+    if sfid is not None:
+        path.append(urllib.unquote(sfid))
+        if cid is not None:
+            if subid is not None:
+                path.append(cid + '|' + subid)
+            else:
+                path.append(cid)
+    return '/'.join(path)
 
 def folder_id_to_name(ident):
     return ident.replace('_', ' ')
@@ -621,3 +680,16 @@ def dedup(it):
         for lab in group:
             yield lab
             break
+
+
+def new_folders(kvlclient, request):
+    try:
+        config = yakonfig.get_global_config('dossier.folders')
+        # For old configs.
+        if 'prefix' in config:
+            config['namespace'] = config.pop('prefix')
+    except KeyError:
+        config = {}
+    if 'annotator_id' in request.query:
+        config['owner'] = request.query['annotator_id']
+    return Folders(kvlclient, **config)
