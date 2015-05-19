@@ -557,20 +557,24 @@ def v1_folder_rename(request, response, kvlclient,
 
 
 if os.getenv('DOSSIER_WEB_DEV', '0') == '1':
-    # This is bunk now. Replace with foldering calls?
-    # @app.delete('/dossier/v1/delete-all-labels')
-    # def v1_delete_all_labels(response, store, label_store):
-        # label_store.delete_all()
-        # # Since the foldering system relies on the FC table for determining
-        # # folders, we need to delete those too. (But we otherwise leave all
-        # # FCs alone.)
-        # for cid in store.scan_prefix_ids('topic|'):
-            # store.delete(cid)
-        # response.status = 204
+    @app.delete('/dossier/v1/delete-all-labels')
+    def v1_delete_all_labels(response, store, label_store):
+        label_store.delete_all()
+        response.status = 204
 
     @app.delete('/dossier/v1/delete-all-fcs')
     def v1_delete_all_fcs(response, store):
         store.delete_all()
+        response.status = 204
+
+    @app.delete('/dossier/v1/delete-all-folders')
+    def v1_delete_all_folders(request, response, kvlclient):
+        new_folders(kvlclient, request).delete_everything()
+        response.status = 204
+
+    @app.delete('/dossier/v1/delete-everything')
+    def v1_delete_everything(response, kvlclient):
+        kvlclient.delete_namespace()
         response.status = 204
 
 
