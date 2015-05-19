@@ -114,6 +114,14 @@ def test_delete_folder(folders):
         folders.get('/a/b')
 
 
+def test_delete_everything(folders):
+    folders.put('/a/b')
+    folders.put('/z')
+    assert len(list(folders.list('/'))) == 2
+    folders.delete_all()
+    assert len(list(folders.list('/'))) == 0
+
+
 def test_idempotent_put(folders):
     folders.put('/a/b/c', 'foo')
     folders.put_folder('/a/b')
