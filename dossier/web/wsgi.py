@@ -7,5 +7,5 @@ This is a WSGI compatible Python script that can be used to make
 ``dossier.web`` run with WSGI servers like ``gunicorn`` and ``uwsgi``.
 '''
 
-from dossier.web.run import get_application
-_, application = get_application()
+from dossier.web.run import default_app
+_, application = default_app()

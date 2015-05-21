@@ -1,42 +1,114 @@
 from __future__ import absolute_import, division, print_function
 
 import abc
+import json
+
+import bottle
+
+from dossier.fc import FeatureTokens, StringCounter
 
 
-class SearchEngine(object):
+class Queryable(object):
+    param_schema = {}
+
+    def __init__(self):
+        self.query_content_id = None
+        self.query_params = {}
+        self.config_params = {}
+        self.params = {}
+        self.apply_param_schema()
+
+    def set_query_id(self, query_content_id):
+        '''Set the query id for this search engine.
+
+        This must be called before calling other methods like
+        ``create_filter_predicate`` or ``recommendations``.
+        '''
+        self.query_content_id = query_content_id
+        return self
+
+    def set_query_params(self, query_params):
+        '''Set the query parameters for this search engine.
+
+        The exact set of query parameters is specified by the end user.
+
+        :param query_params: query parameters
+        :type query_params: ``name |--> str | [str]``
+        '''
+        self.query_params = as_multi_dict(query_params)
+        self.apply_param_schema()
+        return self
+
+    def add_query_params(self, query_params):
+        'Overwrite the given query parameters.'
+        query_params = as_multi_dict(query_params)
+        for k in query_params:
+            self.query_params.pop(k, None)
+            for v in query_params.getlist(k):
+                self.query_params[k] = v
+        self.apply_param_schema()
+        return self
+
+    def apply_param_schema(self):
+        def param_str(name, cons, default):
+            try:
+                v = self.query_params.get(name, default)
+                if v is None:
+                    return v
+                if len(v) == 0:
+                    return default
+                return cons(v)
+            except (TypeError, ValueError):
+                return default
+
+        def param_num(name, cons, default, minimum, maximum):
+            try:
+                n = cons(self.query_params.get(name, default))
+                return min(maximum, max(minimum, n))
+            except (TypeError, ValueError):
+                return default
+
+        config = getattr(self, 'config_params', {})
+        for name, schema in getattr(self, 'param_schema', {}).iteritems():
+            default = config.get(name, schema.get('default', None))
+            v = None
+            if schema['type'] == 'bool':
+                v = param_str(name, lambda s: bool(int(s)), False)
+            elif schema['type'] == 'int':
+                v = param_num(
+                    name, int, default=default,
+                    minimum=schema.get('min', 0),
+                    maximum=schema.get('max', 1000000))
+            elif schema['type'] == 'float':
+                v = param_num(
+                    name, float, default=default,
+                    minimum=schema.get('min', 0),
+                    maximum=schema.get('max', 1000000))
+            elif schema['type'] is 'str':
+                v = param_str(name, schema.get('cons', str), default)
+            elif schema['type'] is 'utf8':
+                v = param_str(name, lambda s: s.decode('utf-8'), default)
+            self.params[name] = v
+
+
+class SearchEngine(Queryable):
     '''Defines an interface for search engines.
 
     A search engine, at a high level, takes a query feature collection
     and returns a list of results, where each result is itself a
     feature collection.
 
-    More generally, a search engine is a :class:`yakonfig.Configurable`
-    object (or one that can be auto-configured) that returns a callable
-    that performs the actual searching.
-
-    Here's an example of a simple search engine that returns the
-    results of an index scan:
-
-    .. code-block:: python
-
-        def search_by_name(store):
-            def _(content_id, filter_pred, limit):
-                fc = store.get(content_id)
-                cids = []
-                for name in fc.get(u'NAME'):
-                    cids.extend(store.index_scan(u'NAME', name))
-                results = list(filter(filter_pred, store.get_many(cids)))
-                return {
-                    'results': results[0:int(limit)],
-                }
-            return _
-
-    .. automethod:: dossier.web.SearchEngine.__init__
-    .. automethod:: dossier.web.SearchEngine.__call__
+    The return format should be a dictionary with at least one key,
+    ``results``, which is a list of tuples of ``(content_id, FC)``,
+    where ``FC`` is a :class:`dossier.fc.FeatureCollection`.
     '''
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractmethod
+    param_schema = {
+        'limit': {'type': 'int', 'default': 30, 'min': 0, 'max': 1000000},
+        'omit_fc': {'type': 'bool', 'default': 0},
+    }
+
     def __init__(self):
         '''Create a new search engine.
 
@@ -54,160 +126,125 @@ class SearchEngine(object):
         :rtype: A callable with a signature isomorphic to
                 :meth:`dossier.web.SearchEngine.__call__`.
         '''
-        pass
+        super(SearchEngine, self).__init__()
+        self._filters = {}
+
+    def add_filter(self, name, filter):
+        '''Add a filter to this search engine.
+
+        :param filter: A filter.
+        :type filter: :class:`dossier.web.Filter`
+        :rtype: self
+        '''
+        self._filters[name] = filter
+        return self
+
+    def create_filter_predicate(self):
+        '''Creates a filter predicate.
+
+        The list of available filters is given by calls to
+        ``add_filter``, and the list of filters to use is given by
+        parameters in ``query_params``.
+
+        In this default implementation, multiple filters can be
+        specified with the ``filter`` parameter. Each filter is
+        initialized with the same set of query parameters given to the
+        search engine.
+
+        The returned function accepts a ``(content_id, FC)`` and
+        returns ``True`` if and only if every selected predicate
+        returns ``True`` on the same input.
+        '''
+        assert self.query_content_id is not None, \
+            'must call SearchEngine.set_query_id first'
+
+        filter_names = self.query_params.getlist('filter')
+        if len(filter_names) == 0 and 'already_labeled' in self._filters:
+            filter_names = ['already_labeled']
+        init_filters = [(n, self._filters[n]) for n in filter_names]
+        preds = [lambda _: True]
+        for name, p in init_filters:
+            preds.append(p.set_query_id(self.query_content_id)
+                          .set_query_params(self.query_params)
+                          .create_predicate())
+        return lambda (cid, fc): fc is not None and all(p((cid, fc))
+                                                        for p in preds)
 
     @abc.abstractmethod
-    def __call__(content_id, filter_pred, limit, **kwargs):
-        '''Run a search engine.
+    def recommendations(self):
+        '''Return recommendations.
 
-        This method runs a search engine with the query ``content_id``
-        and returns a result set of feature collections.
-
-        ``content_id`` will correspond to a feature collection
-        accessible via a :class:`dossier.store.Store`. Note
-        that ``content_id`` may not point to any existing
-        :class:`dossier.fc.FeatureCollection`. If a feature collection
-        does not exist, a search engine may invent one or simply return
-        no results.
-
-        ``filter_pred`` is a predicate that returns ``True`` given a
-        (``content_id``, :class:`dossier.fc.FeatureCollection`) if
-        that object should be consider as a candidate to appear in the
-        results.  For example, a filtering predicate can ensure
-        already labeled feature collections do not appear again in the
-        results.
-
-        ``limit`` is an integer that determines how many results the
-        user wants to handle. Search engines may assume that this is
-        capped at a reasonable maximum.
-
-        Finally, any additional query parameters in the URL are passed
-        as keyword arguments, which will all be strings.
-
+        The return type is loosely specified. In particular, it must
+        be a dictionary with at least one key, ``results``, which maps
+        to a list of tuples of ``(content_id, FC)``. The returned
+        dictionary may contain other keys.
         '''
-        pass
+        raise NotImplementedError()
+
+    # dbid_to_visid is temp hack
+    def results(self, dbid_to_visid=lambda x: x):
+        results = self.recommendations()
+        transformed = []
+        for t in results['results']:
+            if len(t) == 2:
+                db_cid, fc = t
+                info = {}
+            elif len(t) == 3:
+                db_cid, fc, info = t
+            else:
+                bottle.abort(500, 'Invalid search result: "%r"' % t)
+            result = info
+            result['content_id'] = dbid_to_visid(db_cid)
+            if not self.params['omit_fc']:
+                result['fc'] = fc_to_json(fc)
+            transformed.append(result)
+        results['results'] = transformed
+        return results
+
+    # dbid_to_visid is temp hack
+    def json(self, dbid_to_visid=lambda x: x):
+        return json.dumps(self.results(dbid_to_visid))
 
 
-class Filter(object):
+class Filter(Queryable):
     '''A filter predicate for results returned by search engines.
 
     A filter predicate is a :class:`yakonfig.Configurable` object
     (or one that can be auto-configured) that returns a callable
     for creating a predicate that will filter results produced by
     a search engine.
-
-    The predicate should be a function that accepts a tuple
-    (``content_id``, :class:`dossier.fc.FeatureCollection`) and returns
-    ``True`` if and only if that result should be included in the
-    recommendations presented to the user.
-
-    Here is how the :func:`dossier.web.filter_already_labeled` filter
-    is written:
-
-    .. code-block:: python
-
-        def already_labeled(label_store):
-            def init_filter(query_content_id):
-                labeled = label_store.directly_connected(
-                    query_content_id)
-                labeled_cids = {label.other(query_content_id)
-                                for label in labeled}
-                def p((content_id, fc)):
-                    return content_id not in labeled_cids
-                return p
-            return init_filter
-
-    Note that fetching all of the labels before running the predicate
-    is critical for this to perform well.
     '''
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def __init__(self):
-        '''Create a new filter.
+    def create_predicate(self):
+        '''Creates a predicate for this filter.
 
-        The creation of a filter is distinct from the operation of
-        a filter. Namely, the creation of a filter is subject to
-        dependency injection. The following parameters are special in
-        that they will be automatically populated with special values
-        if present in your ``__init__``:
-
-        * **kvlclient**:
-          :class:`kvlayer._abstract_storage.AbstractStorage`
-        * **store**: :class:`dossier.store.Store`
-        * **label_store**: :class:`dossier.label.LabelStore`
-
-        :rtype: A callable with a signature isomorphic to
-                :meth:`dossier.web.Filter.__call__`.
+        The predicate should accept a tuple of ``(content_id, FC)``
+        and return ``True`` if and only if the given result should be
+        included in the list of recommendations provided to the user.
         '''
-        pass
-
-    @abc.abstractmethod
-    def __call__(self, query_content_id):
-        '''Create a filter predicate function.
-
-        The reason for the extra level of indirection is so that you
-        may run "initialization" code for a particular query. See
-        :meth:`dossier.web.Filter` for an example.
-
-        :param str query_content_id: The content id of the query.
-                                     This *may* correspond to an existing
-                                     feature collection.
-        :rtype: A function with type
-                ``(content_id, FeatureCollection) -> bool``.
-        '''
-        pass
+        raise NotImplementedError()
 
 
-class Route(object):
-    '''Defines an interface for web routes.
+def fc_to_json(fc):
+    d = {}
+    for name, feat in fc.iteritems():
+        if isinstance(feat, (unicode, StringCounter)):
+            d[name] = feat
+        elif isinstance(feat, FeatureTokens):
+            d[name] = feat.to_dict()
+    return d
 
-    A web route is a function that receives HTTP requests and returns
-    HTTP responses.
 
-    You may add your own routes to a ``dossier.web`` application by
-    defining Python objects that conform to the interface defined here
-    (they do not need to subclass this class).
-
-    .. automethod:: dossier.web.Route.__init__
-    '''
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def __init__(self, bottle_app):
-        '''Add routes to an existing Bottle application.
-
-        This interface permits one to add new routes to the
-        Bottle application used by ``dossier.web``. For example:
-
-        .. code-block:: python
-
-            def my_route(bottle_app):
-                @bottle_app.get('/visit-me')
-                def bottle_route():
-                    return 'Hello, world!'
-
-            # Use it in the application.
-            _, app = get_application(routes=[my_route])
-
-        ``dossier.web`` also configures dependency injection for your
-        routes. The following is a list of special parameter names that
-        can appear in your route function. They will be automatically
-        populated with values of the following types:
-
-        * **config**: :class:`dossier.web.Config`
-        * **kvlclient**:
-          :class:`kvlayer._abstract_storage.AbstractStorage`
-        * **store**: :class:`dossier.store.Store`
-        * **label_store**: :class:`dossier.label.LabelStore`
-        * **search_engines**: ``list`` of search engines (which are
-          duck typed to :class:`dossier.web.SearchEngine`).
-        * **filter_preds**: ``list`` of filter predicates (which are
-          duck typed to :class:`dossier.web.Filter`).
-        * **request**: :class:`bottle.Request`
-        * **response**: :class:`bottle.Response`
-
-        :param bottle_app: A Bottle application.
-        :type bottle_app: :class:`bottle.Bottle`
-        '''
-        pass
+def as_multi_dict(d):
+    if isinstance(d, bottle.MultiDict):
+        return d
+    md = bottle.MultiDict()
+    for k, v in d.iteritems():
+        if isinstance(v, list):
+            for x in v:
+                md[k] = x
+        else:
+            md[k] = v
+    return md

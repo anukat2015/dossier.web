@@ -91,7 +91,7 @@ class Config(yakonfig.factory.AutoFactory):
         return 'dossier.web'
 
     @property
-    def dossier_web_config(self):
+    def web_config(self):
         return self
 
     @property

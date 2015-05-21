@@ -11,12 +11,13 @@ import logging
 import random as rand
 
 from dossier.fc import SparseVector, StringCounter
+from dossier.web.interface import SearchEngine
 
 
 logger = logging.getLogger(__name__)
 
 
-def random(store):
+class random(SearchEngine):
     '''Return random results with the same name.
 
     This finds all content objects that have a matching name and
@@ -25,39 +26,44 @@ def random(store):
     If there is no ``NAME`` index defined, then this always returns
     no results.
     '''
-    def _(content_id, filter_pred, limit):
-        if u'NAME' not in store.index_names():
+    def __init__(self, store):
+        super(random, self).__init__()
+        self.store = store
+
+    def recommendations(self):
+        if u'NAME' not in self.store.index_names():
             return {'results': []}
 
-        fc = store.get(content_id)
+        fc = self.store.get(self.query_content_id)
         if fc is None:
-            raise KeyError(content_id)
+            raise KeyError(self.query_content_id)
         cids = []
         for name in fc.get(u'NAME'):
-            cids.extend(store.index_scan(u'NAME', name))
-        results = list(ifilter(
-            lambda (cid, fc): fc is not None and filter_pred((cid, fc)),
-            store.get_many(cids)))
+            cids.extend(self.store.index_scan(u'NAME', name))
+        predicate = self.create_filter_predicate()
+        results = list(ifilter(predicate, self.store.get_many(cids)))
         rand.shuffle(results)
-        return {'results': results[0:limit]}
-    return _
+        return {'results': results[0:self.params['limit']]}
 
 
-class plain_index_scan(object):
+class plain_index_scan(SearchEngine):
     '''Return a random sample of an index scan.
 
     This scans all indexes defined for all values in the query
     corresponding to those indexes.
     '''
     def __init__(self, store):
+        super(plain_index_scan, self).__init__()
         self.store = store
 
-    def __call__(self, content_id, filter_pred, limit):
-        cids = self.streaming_ids(content_id)
-        results = ifilter(lambda (cid, fc):
-                              fc is not None and filter_pred((cid, fc)),
+    def recommendations(self):
+        predicate = self.create_filter_predicate()
+        cids = self.streaming_ids(self.query_content_id)
+        results = ifilter(predicate,
                           ((cid, self.store.get(cid)) for cid in cids))
-        return {'results': streaming_sample(results, limit, limit * 10)}
+        sample = streaming_sample(
+            results, self.params['limit'], self.params['limit'] * 10)
+        return {'results': sample}
 
     def get_query_fc(self, content_id):
         query_fc = self.store.get(content_id)
