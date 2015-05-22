@@ -27,6 +27,8 @@ Some useful utility functions.
 from dossier.web.builder import WebBuilder, add_cli_arguments
 from dossier.web.config import Config
 from dossier.web.filter_preds import already_labeled as filter_already_labeled
+from dossier.web.filter_preds import \
+    nilsimsa_near_duplicates as filter_nilsimsa_near_duplicates
 from dossier.web.folder import Folders
 from dossier.web.interface import SearchEngine, Filter, Route
 from dossier.web.search_engines import random as engine_random
@@ -38,6 +40,7 @@ __all__ = [
     'Config',
     'Folders',
     'SearchEngine', 'Filter', 'Route',
-    'filter_already_labeled', 'engine_random', 'engine_index_scan',
+    'filter_already_labeled', 'filter_nilsimsa_near_duplicates',
+    'engine_random', 'engine_index_scan',
     'streaming_sample',
 ]
