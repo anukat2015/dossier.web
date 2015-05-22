@@ -25,6 +25,7 @@ class WebBuilder(object):
         self.filters = {
             'already_labeled': already_labeled,
         }
+        self.mount_prefix = None
         self.config = None
         if add_default_routes:
             self.add_routes(default_app)
@@ -38,7 +39,7 @@ class WebBuilder(object):
             # a default.
             self.config = Config()
         if self.mount_prefix is None:
-            self.mount_prefix = self.config.get('url_prefix')
+            self.mount_prefix = self.config.config.get('url_prefix')
 
         self.inject('config', lambda: self.config)
         self.inject('kvlclient', lambda: self.config.kvlclient)
@@ -50,11 +51,14 @@ class WebBuilder(object):
         self.inject('response', lambda: bottle.response)
 
         # DEPRECATED. Remove. ---AG
-        self.inject('visid_to_dbid', self.visid_to_dbid)
-        self.inject('dbid_to_visid', self.dbid_to_visid)
+        self.inject('visid_to_dbid', lambda: self.visid_to_dbid)
+        self.inject('dbid_to_visid', lambda: self.dbid_to_visid)
+
+        # Also DEPRECATED.
+        self.inject('label_hooks', lambda: [])
 
         # Load routes defined in entry points.
-        for extroute in self.config.get('external_routes', []):
+        for extroute in self.config.config.get('external_routes', []):
             mod, fun_name = extroute.split(':')
             fun = getattr(__import__(mod, fromlist=[fun_name]), fun_name)
             self.add_routes(fun())
@@ -79,14 +83,21 @@ class WebBuilder(object):
 
     def mount(self, prefix):
         self.mount_prefix = prefix
+        return self
+
+    def set_config(self, config_instance):
+        self.config = config_instance
+        return self
 
     def add_search_engine(self, name, engine):
         if engine is None:
             self.search_engines.pop(name, None)
         self.search_engines[name] = engine
+        return self
 
     def add_filter(self, name, filter):
         self.filters[name] = filter
+        return self
 
     def add_routes(self, routes):
         # Basically the same as `self.app.merge(routes)`, except this
@@ -97,9 +108,11 @@ class WebBuilder(object):
         for route in routes:
             route.app = self.app
             self.app.add_route(route)
+        return self
 
     def inject(self, name, closure):
         self.app.install(create_injector(name, closure))
+        return self
 
     def enable_cors(self):
         def access_control_headers():
@@ -124,15 +137,18 @@ class WebBuilder(object):
             return bottle.request.app.default_error_handler(res)
 
         self.app.add_hook('after_request', access_control_headers)
-        self.error_handler[int(405)] = options_response
+        self.app.error_handler[int(405)] = options_response
+        return self
 
     def set_visid_to_dbid(self, f):
         'DEPRECATED. DO NOT USE.'
         self.visid_to_dbid = f
+        return self
 
     def set_dbid_to_visid(self, f):
         'DEPRECATED. DO NOT USE.'
         self.visid_to_dbid = f
+        return self
 
 
 class BottleAppFixScriptName(bottle.Bottle):
@@ -200,7 +216,7 @@ class JsonPlugin(object):
         return _
 
 
-def add_arguments(p):
+def add_cli_arguments(p):
     p.add_argument('--bottle-debug', action='store_true',
                    help='Enable Bottle\'s debug mode.')
     p.add_argument('--reload', action='store_true',

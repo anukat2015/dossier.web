@@ -81,7 +81,6 @@ import urllib
 import urlparse
 
 import bottle
-import cbor
 
 from dossier.fc import FeatureCollection, FeatureTokens, StringCounter
 from dossier.label import Label, CorefValue
@@ -91,15 +90,7 @@ from dossier.web.search_engines import streaming_sample
 import yakonfig
 
 
-class BottleAppFixScriptName(bottle.Bottle):
-    def __call__(self, env, start):
-        script_name = env.get('HTTP_DOSSIER_SCRIPT_NAME')
-        if script_name is not None:
-            env['SCRIPT_NAME'] = script_name
-        return super(BottleAppFixScriptName, self).__call__(env, start)
-
-
-app = BottleAppFixScriptName()
+app = bottle.Bottle()
 logger = logging.getLogger(__name__)
 web_static_path = path.join(path.split(__file__)[0], 'static')
 
