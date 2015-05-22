@@ -102,7 +102,7 @@ def v1_static(name):
 
 @app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>', json=True)
 def v1_search(request, visid_to_dbid, dbid_to_visid,
-              config, search_engines, filter_preds, cid, engine_name):
+              config, search_engines, filters, cid, engine_name):
     '''Search feature collections.
 
     The route for this endpoint is:
@@ -142,7 +142,7 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
     filter_names = request.query.getall('filter') or ['already_labeled']
     request.query.pop('filter', None)  # remove from query dict
     try:
-        init_filter_preds = [(n, filter_preds[n]) for n in filter_names]
+        init_filters = [(n, filters[n]) for n in filter_names]
     except KeyError as e:
         bottle.abort(404,
             'Rank filter "%s" does not exist.' % e.message)
@@ -150,9 +150,9 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
 
 
     filter_pred = lambda _: True
-    if len(init_filter_preds) > 0:
+    if len(init_filters) > 0:
         preds = []
-        for name, p in init_filter_preds:
+        for name, p in init_filters:
             kwargs = {}
             for k in request.query.keys():
                 prefix = 'filter_' + name + '_'
