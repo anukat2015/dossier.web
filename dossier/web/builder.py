@@ -60,6 +60,7 @@ class WebBuilder(object):
         # Load routes defined in entry points.
         for extroute in self.config.config.get('external_routes', []):
             mod, fun_name = extroute.split(':')
+            logger.info('Loading external route: %s', extroute)
             fun = getattr(__import__(mod, fromlist=[fun_name]), fun_name)
             self.add_routes(fun())
 
