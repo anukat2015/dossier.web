@@ -25,6 +25,7 @@ Some useful utility functions.
 .. automodule:: dossier.web.folder
 '''
 from dossier.web.builder import WebBuilder, add_cli_arguments
+from dossier.web.config import Config
 from dossier.web.filter_preds import already_labeled as filter_already_labeled
 from dossier.web.folder import Folders
 from dossier.web.interface import SearchEngine, Filter, Route
@@ -34,6 +35,7 @@ from dossier.web.search_engines import streaming_sample
 
 __all__ = [
     'WebBuilder', 'add_cli_arguments',
+    'Config',
     'Folders',
     'SearchEngine', 'Filter', 'Route',
     'filter_already_labeled', 'engine_random', 'engine_index_scan',
