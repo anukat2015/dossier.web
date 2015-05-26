@@ -148,7 +148,7 @@ class WebBuilder(object):
 
     def set_dbid_to_visid(self, f):
         'DEPRECATED. DO NOT USE.'
-        self.visid_to_dbid = f
+        self.dbid_to_visid = f
         return self
 
 
