@@ -26,14 +26,6 @@ def already_labeled(label_store):
     return init_filter
 
 
-def get_query_fc(store, query_content_id):
-    '''Called by nilsimsa_near_duplicates to get the query_fc; can be
-    monkey patched to change how the query_fc is obtained.
-
-    '''
-    return store.get(query_content_id)
-
-
 def get_string_counter(fc, feature_name):
     '''Find and return a :class:`~dossier.fc.StringCounter` at
     `feature_name` or at `DISPLAY_PREFIX` + `feature_name` in the
@@ -50,11 +42,7 @@ def get_string_counter(fc, feature_name):
         return None
 
 
-def nilsimsa_near_duplicates(
-        label_store, store,
-        nilsimsa_feature_name = 'nilsimsa_all',
-        threshold = 119,
-    ):
+class nilsimsa_near_duplicates(object):
     '''Filter results that nilsimsa says are highly similar to the query
     FC or any FC that was not filtered earlier in the stream.  To
     perform an filtering, this requires that the FCs carry
@@ -97,9 +85,17 @@ def nilsimsa_near_duplicates(
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 209 filtered to 9 in 0.009230 seconds, 22643.802754 per second
 
     '''
-    def init_filter(query_content_id):
-        query_fc = get_query_fc(store, query_content_id)
-        sim_feature = get_string_counter(query_fc, nilsimsa_feature_name)
+
+    def __init__(self, label_store, store,
+                 nilsimsa_feature_name='nilsimsa_all', threshold=119):
+        self.label_store = label_store
+        self.store = store
+        self.nilsimsa_feature_name = nilsimsa_feature_name
+        self.threshold = threshold
+
+    def __call__(self, query_content_id):
+        query_fc = self.get_query_fc(query_content_id)
+        sim_feature = get_string_counter(query_fc, self.nilsimsa_feature_name)
 
         accumulator = dict()
         if sim_feature:
@@ -107,8 +103,7 @@ def nilsimsa_near_duplicates(
                 accumulator[nhash] = query_content_id
 
         def accumulating_predicate((content_id, fc)):
-
-            sim_feature = get_string_counter(fc, nilsimsa_feature_name)
+            sim_feature = get_string_counter(fc, self.nilsimsa_feature_name)
             if not sim_feature:
                 return True
 
@@ -120,8 +115,9 @@ def nilsimsa_near_duplicates(
                     return False
 
             for hash1, hash2 in product(sim_feature, accumulator):
-                score = nilsimsa.compare_digests(hash1, hash2, threshold=threshold)
-                if score > threshold:
+                score = nilsimsa.compare_digests(hash1, hash2,
+                                                 threshold=self.threshold)
+                if score > self.threshold:
                     ## near duplicate, so filter and do not accumulate
                     return False
 
@@ -133,4 +129,5 @@ def nilsimsa_near_duplicates(
 
         return accumulating_predicate
 
-    return init_filter
+    def get_query_fc(self, query_content_id):
+        return self.store.get(query_content_id)
