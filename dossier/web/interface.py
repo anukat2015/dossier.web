@@ -10,34 +10,13 @@ class SearchEngine(object):
     and returns a list of results, where each result is itself a
     feature collection.
 
-    More generally, a search engine is a :class:`yakonfig.Configurable`
-    object (or one that can be auto-configured) that returns a callable
-    that performs the actual searching.
-
-    Here's an example of a simple search engine that returns the
-    results of an index scan:
-
-    .. code-block:: python
-
-        def search_by_name(store):
-            def _(content_id, filter_pred, limit):
-                fc = store.get(content_id)
-                cids = []
-                for name in fc.get(u'NAME'):
-                    cids.extend(store.index_scan(u'NAME', name))
-                results = list(filter(filter_pred, store.get_many(cids)))
-                return {
-                    'results': results[0:int(limit)],
-                }
-            return _
-
-    .. automethod:: dossier.web.SearchEngine.__init__
-    .. automethod:: dossier.web.SearchEngine.__call__
+    The return format should be a dictionary with at least one key,
+    ``results``, which is a list of tuples of ``(content_id, FC)``,
+    where ``FC`` is a :class:`dossier.fc.FeatureCollection`.
     '''
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractmethod
-    def __init__(self):
+    def __init__(self, config):
         '''Create a new search engine.
 
         The creation of a search engine is distinct from the operation
@@ -54,38 +33,80 @@ class SearchEngine(object):
         :rtype: A callable with a signature isomorphic to
                 :meth:`dossier.web.SearchEngine.__call__`.
         '''
-        pass
+        self.config = config
+        self.query_content_id = None
+        self.query_params = {}
+        self._filters = []
+
+    def set_query_id(self, query_content_id):
+        '''Set the query id for this search engine.
+
+        This must be called before calling other methods like
+        ``create_filter_predicate`` or ``recommendations``.
+        '''
+        self.query_content_id = query_content_id
+        return self
+
+    def set_query_params(self, query_params):
+        '''Set the query parameters for this search engine.
+
+        The exact set of query parameters is specified by the end user.
+
+        :param query_params: query parameters
+        :type query_params: ``name |--> str | [str]``
+        '''
+        self.query_params = query_params
+        return self
+
+    def add_filter(self, name, filter):
+        '''Add a filter to this search engine.
+
+        :param filter: A filter.
+        :type filter: :class:`dossier.web.Filter`
+        :rtype: self
+        '''
+        self._filters.append(filter)
+        return self
+
+    def create_filter_predicate(self):
+        '''Creates a filter predicate.
+
+        The list of available filters is given by calls to
+        ``add_filter``, and the list of filters to use is given by
+        parameters in ``query_params``.
+
+        In this default implementation, multiple filters can be
+        specified with the ``filter`` parameter. Each filter is
+        initialized with the same set of query parameters given to the
+        search engine.
+
+        The returned function accepts a ``(content_id, FC)`` and
+        returns ``True`` if and only if every selected predicate
+        returns ``True`` on the same input.
+        '''
+        assert self.query_content_id is not None, \
+                'must call SearchEngine.set_query_id first'
+
+        filter_names = self.query_params.get('filter', ['already_labeled'])
+        init_filters = [(n, self._filters[n]) for n in filter_names]
+        preds = [lambda _: True]
+        for name, p in init_filters:
+            preds.append(self.config.create(p)
+                             .set_query_id(self.query_content_id)
+                             .set_query_params(self.query_params)
+                             .create_predicate())
+        return lambda (cid, fc): all(p((cid, fc)) for p in preds)
 
     @abc.abstractmethod
-    def __call__(content_id, filter_pred, limit, **kwargs):
-        '''Run a search engine.
+    def recommendations(self):
+        '''Return recommendations.
 
-        This method runs a search engine with the query ``content_id``
-        and returns a result set of feature collections.
-
-        ``content_id`` will correspond to a feature collection
-        accessible via a :class:`dossier.store.Store`. Note
-        that ``content_id`` may not point to any existing
-        :class:`dossier.fc.FeatureCollection`. If a feature collection
-        does not exist, a search engine may invent one or simply return
-        no results.
-
-        ``filter_pred`` is a predicate that returns ``True`` given a
-        (``content_id``, :class:`dossier.fc.FeatureCollection`) if
-        that object should be consider as a candidate to appear in the
-        results.  For example, a filtering predicate can ensure
-        already labeled feature collections do not appear again in the
-        results.
-
-        ``limit`` is an integer that determines how many results the
-        user wants to handle. Search engines may assume that this is
-        capped at a reasonable maximum.
-
-        Finally, any additional query parameters in the URL are passed
-        as keyword arguments, which will all be strings.
-
+        The return type is loosely specified. In particular, it must
+        be a dictionary with at least one key, ``results``, which maps
+        to a list of tuples of ``(content_id, FC)``. The returned
+        dictionary may contain other keys.
         '''
-        pass
+        raise NotImplementedError()
 
 
 class Filter(object):
@@ -95,119 +116,40 @@ class Filter(object):
     (or one that can be auto-configured) that returns a callable
     for creating a predicate that will filter results produced by
     a search engine.
-
-    The predicate should be a function that accepts a tuple
-    (``content_id``, :class:`dossier.fc.FeatureCollection`) and returns
-    ``True`` if and only if that result should be included in the
-    recommendations presented to the user.
-
-    Here is how the :func:`dossier.web.filter_already_labeled` filter
-    is written:
-
-    .. code-block:: python
-
-        def already_labeled(label_store):
-            def init_filter(query_content_id):
-                labeled = label_store.directly_connected(
-                    query_content_id)
-                labeled_cids = {label.other(query_content_id)
-                                for label in labeled}
-                def p((content_id, fc)):
-                    return content_id not in labeled_cids
-                return p
-            return init_filter
-
-    Note that fetching all of the labels before running the predicate
-    is critical for this to perform well.
     '''
     __metaclass__ = abc.ABCMeta
 
-    @abc.abstractmethod
     def __init__(self):
-        '''Create a new filter.
+        self.query_content_id = None
+        self.query_params = {}
 
-        The creation of a filter is distinct from the operation of
-        a filter. Namely, the creation of a filter is subject to
-        dependency injection. The following parameters are special in
-        that they will be automatically populated with special values
-        if present in your ``__init__``:
+    def set_query_id(self, query_content_id):
+        '''Set the query id.
 
-        * **kvlclient**:
-          :class:`kvlayer._abstract_storage.AbstractStorage`
-        * **store**: :class:`dossier.store.Store`
-        * **label_store**: :class:`dossier.label.LabelStore`
-
-        :rtype: A callable with a signature isomorphic to
-                :meth:`dossier.web.Filter.__call__`.
+        This is the identifier of the initial query. It can be useful
+        when the filter predicate depends on state derived from the
+        query.
         '''
-        pass
+        self.query_content_id = query_content_id
+        return self
+
+    def set_query_params(self, query_params):
+        '''Set the query parameters.
+
+        The exact set of query parameters is specified by the end user.
+
+        :param query_params: query parameters
+        :type query_params: ``name |--> str | [str]``
+        '''
+        self.query_params = query_params
+        return self
 
     @abc.abstractmethod
-    def __call__(self, query_content_id):
-        '''Create a filter predicate function.
+    def create_predicate(self):
+        '''Creates a predicate for this filter.
 
-        The reason for the extra level of indirection is so that you
-        may run "initialization" code for a particular query. See
-        :meth:`dossier.web.Filter` for an example.
-
-        :param str query_content_id: The content id of the query.
-                                     This *may* correspond to an existing
-                                     feature collection.
-        :rtype: A function with type
-                ``(content_id, FeatureCollection) -> bool``.
+        The predicate should accept a tuple of ``(content_id, FC)``
+        and return ``True`` if and only if the given result should be
+        included in the list of recommendations provided to the user.
         '''
-        pass
-
-
-class Route(object):
-    '''Defines an interface for web routes.
-
-    A web route is a function that receives HTTP requests and returns
-    HTTP responses.
-
-    You may add your own routes to a ``dossier.web`` application by
-    defining Python objects that conform to the interface defined here
-    (they do not need to subclass this class).
-
-    .. automethod:: dossier.web.Route.__init__
-    '''
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def __init__(self, bottle_app):
-        '''Add routes to an existing Bottle application.
-
-        This interface permits one to add new routes to the
-        Bottle application used by ``dossier.web``. For example:
-
-        .. code-block:: python
-
-            def my_route(bottle_app):
-                @bottle_app.get('/visit-me')
-                def bottle_route():
-                    return 'Hello, world!'
-
-            # Use it in the application.
-            _, app = get_application(routes=[my_route])
-
-        ``dossier.web`` also configures dependency injection for your
-        routes. The following is a list of special parameter names that
-        can appear in your route function. They will be automatically
-        populated with values of the following types:
-
-        * **config**: :class:`dossier.web.Config`
-        * **kvlclient**:
-          :class:`kvlayer._abstract_storage.AbstractStorage`
-        * **store**: :class:`dossier.store.Store`
-        * **label_store**: :class:`dossier.label.LabelStore`
-        * **search_engines**: ``list`` of search engines (which are
-          duck typed to :class:`dossier.web.SearchEngine`).
-        * **filter_preds**: ``list`` of filter predicates (which are
-          duck typed to :class:`dossier.web.Filter`).
-        * **request**: :class:`bottle.Request`
-        * **response**: :class:`bottle.Response`
-
-        :param bottle_app: A Bottle application.
-        :type bottle_app: :class:`bottle.Bottle`
-        '''
-        pass
+        raise NotImplementedError()

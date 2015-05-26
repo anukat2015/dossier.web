@@ -138,35 +138,13 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
     except KeyError as e:
         bottle.abort(404,
             'Search engine "%s" does not exist.' % e.message)
+    search_engine = (config.create(search_engine)
+                           .set_query_id(db_cid)
+                           .set_query_params(dict(request.query)))
+    for name, filter in filters.items():
+        search_engine.add_filter(name, filter)
 
-    filter_names = request.query.getall('filter') or ['already_labeled']
-    request.query.pop('filter', None)  # remove from query dict
-    try:
-        init_filters = [(n, filters[n]) for n in filter_names]
-    except KeyError as e:
-        bottle.abort(404,
-            'Rank filter "%s" does not exist.' % e.message)
-    search_engine = config.create(search_engine)
-
-
-    filter_pred = lambda _: True
-    if len(init_filters) > 0:
-        preds = []
-        for name, p in init_filters:
-            kwargs = {}
-            for k in request.query.keys():
-                prefix = 'filter_' + name + '_'
-                if k.startswith(prefix):
-                    param_name = re.sub('^' + prefix, '', k)
-                    kwargs[param_name] = request.query.pop(k)
-            preds.append(config.create(p, **kwargs)(db_cid))
-        filter_pred = lambda (db_cid, fc): all(p((db_cid, fc)) for p in preds)
-
-    search_kwargs = dict(request.query)
-    search_kwargs['filter_pred'] = filter_pred
-    search_kwargs['limit'] = str_to_max_int(request.query.get('limit'), 100)
-
-    results = search_engine(db_cid, **search_kwargs)
+    results = search_engine.recommendations()
     transformed = []
     for t in results['results']:
         if len(t) == 2:
