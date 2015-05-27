@@ -43,7 +43,7 @@ setup(
         'dossier.fc >= 0.2.0',
         'dossier.label >= 0.4.0',
         'dossier.store >= 0.3.1',
-        'kvlayer >= 0.4.14',
+        'kvlayer >= 0.5.7',
         'pytest',
         'nilsimsa >= 0.3.4',
         'uwsgi >= 2',
