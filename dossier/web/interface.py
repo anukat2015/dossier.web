@@ -16,6 +16,25 @@ class SearchEngine(object):
     '''
     __metaclass__ = abc.ABCMeta
 
+    def param(name, cons=str, default=None):
+        def fget(self):
+            try:
+                return cons(self.query_params.get(name, default))
+            except (TypeError, ValueError):
+                return default
+        return property(fget=fget)
+
+    def int_param(name, default=0, minimum=0, maximum=0):
+        def fget(self):
+            try:
+                n = int(self.query_params.get(name, default))
+                return min(maximum, max(minimum, n))
+            except (TypeError, ValueError):
+                return default
+        return property(fget=fget)
+
+    result_limit = int_param('limit', default=30, maximum=1000)
+
     def __init__(self):
         '''Create a new search engine.
 
