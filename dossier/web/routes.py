@@ -76,7 +76,6 @@ import logging
 from operator import attrgetter
 import os
 import os.path as path
-import re
 import urllib
 import urlparse
 
