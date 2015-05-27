@@ -26,8 +26,8 @@ class random(SearchEngine):
     If there is no ``NAME`` index defined, then this always returns
     no results.
     '''
-    def __init__(self, web_config, store):
-        super(random, self).__init__(web_config)
+    def __init__(self, store):
+        super(random, self).__init__()
         self.store = store
 
     def recommendations(self):
@@ -52,8 +52,8 @@ class plain_index_scan(SearchEngine):
     This scans all indexes defined for all values in the query
     corresponding to those indexes.
     '''
-    def __init__(self, web_config, store):
-        super(plain_index_scan, self).__init__(web_config)
+    def __init__(self, store):
+        super(plain_index_scan, self).__init__()
         self.store = store
 
     def recommendations(self):

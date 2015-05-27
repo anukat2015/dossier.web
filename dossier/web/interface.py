@@ -16,7 +16,7 @@ class SearchEngine(object):
     '''
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, web_config):
+    def __init__(self):
         '''Create a new search engine.
 
         The creation of a search engine is distinct from the operation
@@ -33,7 +33,6 @@ class SearchEngine(object):
         :rtype: A callable with a signature isomorphic to
                 :meth:`dossier.web.SearchEngine.__call__`.
         '''
-        self.config = web_config
         self.query_content_id = None
         self.query_params = {}
         self._filters = {}
@@ -93,10 +92,9 @@ class SearchEngine(object):
         init_filters = [(n, self._filters[n]) for n in filter_names]
         preds = [lambda _: True]
         for name, p in init_filters:
-            preds.append(self.config.create(p)
-                             .set_query_id(self.query_content_id)
-                             .set_query_params(self.query_params)
-                             .create_predicate())
+            preds.append(p.set_query_id(self.query_content_id)
+                          .set_query_params(self.query_params)
+                          .create_predicate())
         return lambda (cid, fc): fc is not None and all(p((cid, fc))
                                                         for p in preds)
 

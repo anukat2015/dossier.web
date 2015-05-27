@@ -141,7 +141,7 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
                            .set_query_id(db_cid)
                            .set_query_params(dict(request.query)))
     for name, filter in filters.items():
-        search_engine.add_filter(name, filter)
+        search_engine.add_filter(name, config.create(filter))
 
     results = search_engine.recommendations()
     transformed = []
