@@ -1,4 +1,4 @@
-'''dossier.web.filter_preds provides filter predicates.
+'''dossier.web.filters provides search engine filters.
 
 .. This software is released under an MIT/X11 open source license.
    Copyright 2015 Diffeo, Inc.
@@ -9,56 +9,42 @@ from itertools import product
 import nilsimsa
 
 from dossier.fc import FeatureCollection, StringCounter
+from dossier.web.interface import Filter
 
 
-def already_labeled(label_store):
+class already_labeled(Filter):
     '''Filter results that have a label associated with them.
 
     If a result has a *direct* label between it and the query, then
     it will be removed from the list of results.
     '''
-    def init_filter(query_content_id):
-        labeled = label_store.directly_connected(query_content_id)
-        labeled_cids = {label.other(query_content_id) for label in labeled}
-        def p((content_id, fc)):
-            return content_id not in labeled_cids
-        return p
-    return init_filter
+    def __init__(self, label_store):
+        super(already_labeled, self).__init__()
+        self.label_store = label_store
+
+    def create_predicate(self):
+        labeled = self.label_store.directly_connected(self.query_content_id)
+        labeled_cids = {lab.other(self.query_content_id) for lab in labeled}
+        return lambda (cid, _): cid not in labeled_cids
 
 
-def get_string_counter(fc, feature_name):
-    '''Find and return a :class:`~dossier.fc.StringCounter` at
-    `feature_name` or at `DISPLAY_PREFIX` + `feature_name` in the
-    `fc`, or return None.
+class nilsimsa_near_duplicates(Filter):
+    '''Filter results that nilsimsa says are highly similar.
 
-    '''
-    if feature_name not in fc:
-        feature = fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
-    else:
-        feature = fc.get(feature_name)
-    if isinstance(feature, StringCounter):
-        return feature
-    else:
-        return None
-
-
-class nilsimsa_near_duplicates(object):
-    '''Filter results that nilsimsa says are highly similar to the query
-    FC or any FC that was not filtered earlier in the stream.  To
-    perform an filtering, this requires that the FCs carry
-    StringCounter at `nilsimsa_feature_name` and results with nilsimsa
-    comparison higher than the `threshold` are filtered.  `threshold`
-    defaults to 119, which is in the range [-128, 128] per the
-    definition of nilsimsa.  `nilsimsa_feature_name` defaults to
+    To perform an filtering, this requires that the FCs carry
+    StringCounter at `nilsimsa_feature_name` and results with
+    nilsimsa comparison higher than the `threshold` are filtered.
+    `threshold` defaults to 119, which is in the range [-128, 128] per
+    the definition of nilsimsa. `nilsimsa_feature_name` defaults to
     'nilsimsa_all'.
 
-    A note about speed performance: the order complexity of this
-    filter is linear in the number of results that get through the
-    filter.  While that is unfortunate, it is inherent to the nature
-    of using comparison-based locality sensitive hashing (LSH).  Other
-    LSH techniques, such as shingle hashing with simhash tend to have
-    less fidelity, but can be efficiently indexed to allow O(1)
-    lookups in a filter like this.
+    A note about speed performance: the order complexity of this filter
+    is linear in the number of results that get through the filter.
+    While that is unfortunate, it is inherent to the nature of using
+    comparison-based locality sensitive hashing (LSH). Other LSH
+    techniques, such as shingle hashing with simhash tend to have less
+    fidelity, but can be efficiently indexed to allow O(1) lookups in a
+    filter like this.
 
     Before refactoring this to use nilsimsa directly, this was using a
     "kernel" function that had nilsimsa buried inside it, and it had
@@ -69,7 +55,7 @@ class nilsimsa_near_duplicates(object):
     After refactoring to use nilsimsa directly in this function, the
     constant factors get better, and the order complexity is still
     linear in the number of items that the filter has emitted, because
-    it has to remember them and scan over them.  Thresholding in the
+    it has to remember them and scan over them. Thresholding in the
     nilsimsa.compare_digests function helps considerably: four times
     faster on this synthetic test data when there are many different
     documents, which is the typical case:
@@ -83,9 +69,7 @@ class nilsimsa_near_duplicates(object):
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 5049 filtered to 49 in 0.249705 seconds, 20219.853262 per second
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 1549 filtered to 49 in 0.112724 seconds, 13741.549025 per second
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 209 filtered to 9 in 0.009230 seconds, 22643.802754 per second
-
     '''
-
     def __init__(self, label_store, store,
                  nilsimsa_feature_name='nilsimsa_all', threshold=119):
         self.label_store = label_store
@@ -93,7 +77,7 @@ class nilsimsa_near_duplicates(object):
         self.nilsimsa_feature_name = nilsimsa_feature_name
         self.threshold = threshold
 
-    def __call__(self, query_content_id):
+    def create_predicate(self, query_content_id):
         query_fc = self.get_query_fc(query_content_id)
         sim_feature = get_string_counter(query_fc, self.nilsimsa_feature_name)
 
@@ -131,3 +115,19 @@ class nilsimsa_near_duplicates(object):
 
     def get_query_fc(self, query_content_id):
         return self.store.get(query_content_id)
+
+
+def get_string_counter(fc, feature_name):
+    '''Find and return a :class:`~dossier.fc.StringCounter` at
+    `feature_name` or at `DISPLAY_PREFIX` + `feature_name` in the
+    `fc`, or return None.
+
+    '''
+    if feature_name not in fc:
+        feature = fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
+    else:
+        feature = fc.get(feature_name)
+    if isinstance(feature, StringCounter):
+        return feature
+    else:
+        return None

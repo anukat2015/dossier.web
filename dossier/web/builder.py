@@ -8,7 +8,7 @@ import bottle
 
 from dossier.web import search_engines as builtin_engines
 from dossier.web.config import Config
-from dossier.web.filter_preds import already_labeled
+from dossier.web.filters import already_labeled
 from dossier.web.routes import app as default_app
 
 

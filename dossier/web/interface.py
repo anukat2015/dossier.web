@@ -16,7 +16,7 @@ class SearchEngine(object):
     '''
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, config):
+    def __init__(self, web_config):
         '''Create a new search engine.
 
         The creation of a search engine is distinct from the operation
@@ -33,10 +33,10 @@ class SearchEngine(object):
         :rtype: A callable with a signature isomorphic to
                 :meth:`dossier.web.SearchEngine.__call__`.
         '''
-        self.config = config
+        self.config = web_config
         self.query_content_id = None
         self.query_params = {}
-        self._filters = []
+        self._filters = {}
 
     def set_query_id(self, query_content_id):
         '''Set the query id for this search engine.
@@ -65,7 +65,7 @@ class SearchEngine(object):
         :type filter: :class:`dossier.web.Filter`
         :rtype: self
         '''
-        self._filters.append(filter)
+        self._filters[name] = filter
         return self
 
     def create_filter_predicate(self):
@@ -95,7 +95,12 @@ class SearchEngine(object):
                              .set_query_id(self.query_content_id)
                              .set_query_params(self.query_params)
                              .create_predicate())
-        return lambda (cid, fc): all(p((cid, fc)) for p in preds)
+        return lambda (cid, fc): fc is not None and all(p((cid, fc))
+                                                        for p in preds)
+
+    @property
+    def result_limit(self):
+        return min(1000, int(self.query_params.get('limit', 30)))
 
     @abc.abstractmethod
     def recommendations(self):
