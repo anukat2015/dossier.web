@@ -87,7 +87,9 @@ class SearchEngine(object):
         assert self.query_content_id is not None, \
                 'must call SearchEngine.set_query_id first'
 
-        filter_names = self.query_params.get('filter', ['already_labeled'])
+        filter_names = self.query_params.get('filter', [])
+        if len(filter_names) == 0 and 'already_labeled' in self._filters:
+            filter_names = ['already_labeled']
         init_filters = [(n, self._filters[n]) for n in filter_names]
         preds = [lambda _: True]
         for name, p in init_filters:
