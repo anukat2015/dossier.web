@@ -139,7 +139,7 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
             'Search engine "%s" does not exist.' % e.message)
     search_engine = (config.create(search_engine)
                            .set_query_id(db_cid)
-                           .set_query_params(dict(request.query)))
+                           .set_query_params(request.query))
     for name, filter in filters.items():
         search_engine.add_filter(name, config.create(filter))
 

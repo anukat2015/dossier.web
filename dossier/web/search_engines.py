@@ -43,7 +43,7 @@ class random(SearchEngine):
         predicate = self.create_filter_predicate()
         results = list(ifilter(predicate, self.store.get_many(cids)))
         rand.shuffle(results)
-        return {'results': results[0:self.result_limit]}
+        return {'results': results[0:self.params['limit']]}
 
 
 class plain_index_scan(SearchEngine):
@@ -61,8 +61,8 @@ class plain_index_scan(SearchEngine):
         cids = self.streaming_ids(self.query_content_id)
         results = ifilter(predicate,
                           ((cid, self.store.get(cid)) for cid in cids))
-        sample = streaming_sample(results,
-                                  self.result_limit, self.result_limit * 10)
+        sample = streaming_sample(
+            results, self.params['limit'], self.params['limit'] * 10)
         return {'results': sample}
 
     def get_query_fc(self, content_id):

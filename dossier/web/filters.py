@@ -77,14 +77,14 @@ class nilsimsa_near_duplicates(Filter):
         self.nilsimsa_feature_name = nilsimsa_feature_name
         self.threshold = threshold
 
-    def create_predicate(self, query_content_id):
-        query_fc = self.get_query_fc(query_content_id)
+    def create_predicate(self):
+        query_fc = self.get_query_fc()
         sim_feature = get_string_counter(query_fc, self.nilsimsa_feature_name)
 
         accumulator = dict()
         if sim_feature:
             for nhash in sim_feature:
-                accumulator[nhash] = query_content_id
+                accumulator[nhash] = self.query_content_id
 
         def accumulating_predicate((content_id, fc)):
             sim_feature = get_string_counter(fc, self.nilsimsa_feature_name)
@@ -113,8 +113,8 @@ class nilsimsa_near_duplicates(Filter):
 
         return accumulating_predicate
 
-    def get_query_fc(self, query_content_id):
-        return self.store.get(query_content_id)
+    def get_query_fc(self):
+        return self.store.get(self.query_content_id)
 
 
 def get_string_counter(fc, feature_name):

@@ -2,8 +2,51 @@ from __future__ import absolute_import, division, print_function
 
 import abc
 
+import bottle
 
-class SearchEngine(object):
+
+class ParamSchema(object):
+    def apply_param_schema(self):
+        def param_str(name, cons, default):
+            try:
+                v = self.query_params.get(name, default)
+                if v is None:
+                    return v
+                return cons(v)
+            except (TypeError, ValueError):
+                return default
+
+        def param_num(name, cons, default, minimum, maximum):
+            try:
+                n = cons(self.query_params.get(name, default))
+                return min(maximum, max(minimum, n))
+            except (TypeError, ValueError):
+                return default
+
+        if getattr(self, 'params', None) is None:
+            self.params = {}
+        config = getattr(self, 'config_params', {})
+        for name, schema in getattr(self, 'param_schema', {}).iteritems():
+            default = config.get(name, schema.get('default', None))
+            v = None
+            if schema['type'] == 'int':
+                v = param_num(
+                    name, int, default=default,
+                    minimum=schema.get('min', 0),
+                    maximum=schema.get('max', 1000000))
+            if schema['type'] == 'float':
+                v = param_num(
+                    name, float, default=default,
+                    minimum=schema.get('min', 0),
+                    maximum=schema.get('max', 1000000))
+            elif schema['type'] is 'str':
+                v = param_str(name, schema.get('cons', str), default)
+            elif schema['type'] is 'utf8':
+                v = param_str(name, lambda s: s.decode('utf-8'), default)
+            self.params[name] = v
+
+
+class SearchEngine(ParamSchema):
     '''Defines an interface for search engines.
 
     A search engine, at a high level, takes a query feature collection
@@ -16,24 +59,9 @@ class SearchEngine(object):
     '''
     __metaclass__ = abc.ABCMeta
 
-    def param(name, cons=str, default=None):
-        def fget(self):
-            try:
-                return cons(self.query_params.get(name, default))
-            except (TypeError, ValueError):
-                return default
-        return property(fget=fget)
-
-    def int_param(name, default=0, minimum=0, maximum=0):
-        def fget(self):
-            try:
-                n = int(self.query_params.get(name, default))
-                return min(maximum, max(minimum, n))
-            except (TypeError, ValueError):
-                return default
-        return property(fget=fget)
-
-    result_limit = int_param('limit', default=30, maximum=1000)
+    param_schema = {
+        'limit': {'type': 'int', 'default': 30, 'min': 0, 'max': 1000000},
+    }
 
     def __init__(self):
         '''Create a new search engine.
@@ -54,6 +82,8 @@ class SearchEngine(object):
         '''
         self.query_content_id = None
         self.query_params = {}
+        self.config_params = {}
+        self.params = {}
         self._filters = {}
 
     def set_query_id(self, query_content_id):
@@ -73,7 +103,10 @@ class SearchEngine(object):
         :param query_params: query parameters
         :type query_params: ``name |--> str | [str]``
         '''
+        if not isinstance(query_params, bottle.MultiDict):
+            query_params = bottle.MultiDict(query_params)
         self.query_params = query_params
+        self.apply_param_schema()
         return self
 
     def add_filter(self, name, filter):
@@ -105,7 +138,7 @@ class SearchEngine(object):
         assert self.query_content_id is not None, \
                 'must call SearchEngine.set_query_id first'
 
-        filter_names = self.query_params.get('filter', [])
+        filter_names = self.query_params.getlist('filter')
         if len(filter_names) == 0 and 'already_labeled' in self._filters:
             filter_names = ['already_labeled']
         init_filters = [(n, self._filters[n]) for n in filter_names]
@@ -117,9 +150,6 @@ class SearchEngine(object):
         return lambda (cid, fc): fc is not None and all(p((cid, fc))
                                                         for p in preds)
 
-    @property
-    def result_limit(self):
-        return min(1000, int(self.query_params.get('limit', 30)))
 
     @abc.abstractmethod
     def recommendations(self):
@@ -133,7 +163,7 @@ class SearchEngine(object):
         raise NotImplementedError()
 
 
-class Filter(object):
+class Filter(ParamSchema):
     '''A filter predicate for results returned by search engines.
 
     A filter predicate is a :class:`yakonfig.Configurable` object
@@ -142,6 +172,7 @@ class Filter(object):
     a search engine.
     '''
     __metaclass__ = abc.ABCMeta
+    param_schema = {}
 
     def __init__(self):
         self.query_content_id = None
@@ -166,6 +197,7 @@ class Filter(object):
         :type query_params: ``name |--> str | [str]``
         '''
         self.query_params = query_params
+        self.apply_param_schema()
         return self
 
     @abc.abstractmethod
