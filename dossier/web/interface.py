@@ -1,8 +1,11 @@
 from __future__ import absolute_import, division, print_function
 
 import abc
+import json
 
 import bottle
+
+from dossier.fc import FeatureTokens, StringCounter
 
 
 class ParamSchema(object):
@@ -12,6 +15,8 @@ class ParamSchema(object):
                 v = self.query_params.get(name, default)
                 if v is None:
                     return v
+                if len(v) == 0:
+                    return default
                 return cons(v)
             except (TypeError, ValueError):
                 return default
@@ -29,12 +34,14 @@ class ParamSchema(object):
         for name, schema in getattr(self, 'param_schema', {}).iteritems():
             default = config.get(name, schema.get('default', None))
             v = None
-            if schema['type'] == 'int':
+            if schema['type'] == 'bool':
+                v = param_str(name, lambda s: bool(int(2)), False)
+            elif schema['type'] == 'int':
                 v = param_num(
                     name, int, default=default,
                     minimum=schema.get('min', 0),
                     maximum=schema.get('max', 1000000))
-            if schema['type'] == 'float':
+            elif schema['type'] == 'float':
                 v = param_num(
                     name, float, default=default,
                     minimum=schema.get('min', 0),
@@ -61,6 +68,7 @@ class SearchEngine(ParamSchema):
 
     param_schema = {
         'limit': {'type': 'int', 'default': 30, 'min': 0, 'max': 1000000},
+        'omit_fc': {'type': 'bool', 'default': 0},
     }
 
     def __init__(self):
@@ -162,6 +170,30 @@ class SearchEngine(ParamSchema):
         '''
         raise NotImplementedError()
 
+    # dbid_to_visid is temp hack
+    def results(self, dbid_to_visid=lambda x: x):
+        results = self.recommendations()
+        transformed = []
+        for t in results['results']:
+            if len(t) == 2:
+                db_cid, fc = t
+                info = {}
+            elif len(t) == 3:
+                db_cid, fc, info = t
+            else:
+                bottle.abort(500, 'Invalid search result: "%r"' % t)
+            result = info
+            result['content_id'] = dbid_to_visid(db_cid)
+            if not self.params['omit_fc']:
+                result['fc'] = fc_to_json(fc)
+            transformed.append(result)
+        results['results'] = transformed
+        return results
+
+    # dbid_to_visid is temp hack
+    def json(self, dbid_to_visid=lambda x: x):
+        return json.dumps(self.results(dbid_to_visid))
+
 
 class Filter(ParamSchema):
     '''A filter predicate for results returned by search engines.
@@ -209,3 +241,13 @@ class Filter(ParamSchema):
         included in the list of recommendations provided to the user.
         '''
         raise NotImplementedError()
+
+
+def fc_to_json(fc):
+    d = {}
+    for name, feat in fc.iteritems():
+        if isinstance(feat, (unicode, StringCounter)):
+            d[name] = feat
+        elif isinstance(feat, FeatureTokens):
+            d[name] = feat.to_dict()
+    return d

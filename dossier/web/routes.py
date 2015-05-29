@@ -99,8 +99,8 @@ def v1_static(name):
     return bottle.static_file(name, root=path.join(web_static_path, 'v1'))
 
 
-@app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>', json=True)
-def v1_search(request, visid_to_dbid, dbid_to_visid,
+@app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>')
+def v1_search(request, response, visid_to_dbid, dbid_to_visid,
               config, search_engines, filters, cid, engine_name):
     '''Search feature collections.
 
@@ -129,9 +129,7 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
       feature collections that have already been labeled with the
       query ``content_id``.
     '''
-    omit_fc = request.query.pop('omit_fc', '0') == '1'
     db_cid = visid_to_dbid(cid)
-
     try:
         search_engine = search_engines[engine_name]
     except KeyError as e:
@@ -142,24 +140,8 @@ def v1_search(request, visid_to_dbid, dbid_to_visid,
                            .set_query_params(request.query))
     for name, filter in filters.items():
         search_engine.add_filter(name, config.create(filter))
-
-    results = search_engine.recommendations()
-    transformed = []
-    for t in results['results']:
-        if len(t) == 2:
-            db_cid, fc = t
-            info = {}
-        elif len(t) == 3:
-            db_cid, fc, info = t
-        else:
-            bottle.abort(500, 'Invalid search result: "%r"' % t)
-        result = info
-        result['content_id'] = dbid_to_visid(db_cid)
-        if not omit_fc:
-            result['fc'] = fc_to_json(fc)
-        transformed.append(result)
-    results['results'] = transformed
-    return results
+    response.content_type = 'application/json'
+    return search_engine.json(dbid_to_visid)
 
 
 @app.get('/dossier/v1/search_engines', json=True)
