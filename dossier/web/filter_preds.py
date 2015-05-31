@@ -19,7 +19,7 @@ def already_labeled(label_store):
     '''
     def init_filter(query_content_id):
         labeled = label_store.directly_connected(query_content_id)
-        labeled_cids = {label.other(query_content_id) for label in labeled}
+        labeled_cids = set([label.other(query_content_id) for label in labeled])
         def p((content_id, fc)):
             return content_id not in labeled_cids
         return p

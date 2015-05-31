@@ -76,7 +76,7 @@ class plain_index_scan(object):
         if query_fc is None:
             return
 
-        blacklist = {content_id}
+        blacklist = set([content_id])
         cids = set()
         logger.info('starting index scan (query content id: %s)', content_id)
         for idx_name in self.store.index_names():
