@@ -170,6 +170,10 @@ class Folders(object):
             raise KeyError(path)
         self.kvl.put(self.TABLE, Folders.to_kvlayer(parent))
 
+    def delete_all(self):
+        for it in self.list('/'):
+            self.delete(it.path)
+
     def move(self, src_path, dest_path):
         src = self.get(src_path)
         if src.inode == 0:
