@@ -8,7 +8,48 @@ import bottle
 from dossier.fc import FeatureTokens, StringCounter
 
 
-class ParamSchema(object):
+class Queryable(object):
+    param_schema = {}
+
+    def __init__(self):
+        self.query_content_id = None
+        self.query_params = {}
+        self.config_params = {}
+        self.params = {}
+        self.apply_param_schema()
+
+    def set_query_id(self, query_content_id):
+        '''Set the query id for this search engine.
+
+        This must be called before calling other methods like
+        ``create_filter_predicate`` or ``recommendations``.
+        '''
+        self.query_content_id = query_content_id
+        return self
+
+    def set_query_params(self, query_params):
+        '''Set the query parameters for this search engine.
+
+        The exact set of query parameters is specified by the end user.
+
+        :param query_params: query parameters
+        :type query_params: ``name |--> str | [str]``
+        '''
+        if not isinstance(query_params, bottle.MultiDict):
+            query_params = bottle.MultiDict(query_params)
+        self.query_params = query_params
+        self.apply_param_schema()
+        return self
+
+    def add_query_params(self, query_params):
+        'Add or overwrite the given query parameters.'
+        if not isinstance(query_params, bottle.MultiDict):
+            query_params = bottle.MultiDict(query_params)
+        for k, v in query_params.items():
+            self.query_params[k] = v
+        self.apply_param_schema()
+        return self
+
     def apply_param_schema(self):
         def param_str(name, cons, default):
             try:
@@ -28,14 +69,12 @@ class ParamSchema(object):
             except (TypeError, ValueError):
                 return default
 
-        if getattr(self, 'params', None) is None:
-            self.params = {}
         config = getattr(self, 'config_params', {})
         for name, schema in getattr(self, 'param_schema', {}).iteritems():
             default = config.get(name, schema.get('default', None))
             v = None
             if schema['type'] == 'bool':
-                v = param_str(name, lambda s: bool(int(2)), False)
+                v = param_str(name, lambda s: bool(int(s)), False)
             elif schema['type'] == 'int':
                 v = param_num(
                     name, int, default=default,
@@ -53,7 +92,7 @@ class ParamSchema(object):
             self.params[name] = v
 
 
-class SearchEngine(ParamSchema):
+class SearchEngine(Queryable):
     '''Defines an interface for search engines.
 
     A search engine, at a high level, takes a query feature collection
@@ -88,34 +127,8 @@ class SearchEngine(ParamSchema):
         :rtype: A callable with a signature isomorphic to
                 :meth:`dossier.web.SearchEngine.__call__`.
         '''
-        self.query_content_id = None
-        self.query_params = {}
-        self.config_params = {}
-        self.params = {}
+        super(SearchEngine, self).__init__()
         self._filters = {}
-
-    def set_query_id(self, query_content_id):
-        '''Set the query id for this search engine.
-
-        This must be called before calling other methods like
-        ``create_filter_predicate`` or ``recommendations``.
-        '''
-        self.query_content_id = query_content_id
-        return self
-
-    def set_query_params(self, query_params):
-        '''Set the query parameters for this search engine.
-
-        The exact set of query parameters is specified by the end user.
-
-        :param query_params: query parameters
-        :type query_params: ``name |--> str | [str]``
-        '''
-        if not isinstance(query_params, bottle.MultiDict):
-            query_params = bottle.MultiDict(query_params)
-        self.query_params = query_params
-        self.apply_param_schema()
-        return self
 
     def add_filter(self, name, filter):
         '''Add a filter to this search engine.
@@ -195,7 +208,7 @@ class SearchEngine(ParamSchema):
         return json.dumps(self.results(dbid_to_visid))
 
 
-class Filter(ParamSchema):
+class Filter(Queryable):
     '''A filter predicate for results returned by search engines.
 
     A filter predicate is a :class:`yakonfig.Configurable` object
@@ -204,33 +217,6 @@ class Filter(ParamSchema):
     a search engine.
     '''
     __metaclass__ = abc.ABCMeta
-    param_schema = {}
-
-    def __init__(self):
-        self.query_content_id = None
-        self.query_params = {}
-
-    def set_query_id(self, query_content_id):
-        '''Set the query id.
-
-        This is the identifier of the initial query. It can be useful
-        when the filter predicate depends on state derived from the
-        query.
-        '''
-        self.query_content_id = query_content_id
-        return self
-
-    def set_query_params(self, query_params):
-        '''Set the query parameters.
-
-        The exact set of query parameters is specified by the end user.
-
-        :param query_params: query parameters
-        :type query_params: ``name |--> str | [str]``
-        '''
-        self.query_params = query_params
-        self.apply_param_schema()
-        return self
 
     @abc.abstractmethod
     def create_predicate(self):
