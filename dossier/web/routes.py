@@ -1,7 +1,8 @@
 '''
 Web service for active learning
 ===============================
-dossier.web.routes.app is a REST stateful web service that can
+
+dossier.web.routes is a REST stateful web service that can
 drive Dossier Stack's an active ranking models and user interface, as
 well as other search technologies.
 
@@ -29,6 +30,7 @@ The API end points are documented as functions in this module.
 
 Managing folders and sub-folders
 ================================
+
 In many places where active learning is used, it can be useful to
 provide the user with a means to group and categorize topics. In an
 active learning setting, it is essential that we try to capture a
@@ -133,8 +135,7 @@ def v1_search(request, response, visid_to_dbid, dbid_to_visid,
     try:
         search_engine = search_engines[engine_name]
     except KeyError as e:
-        bottle.abort(404,
-            'Search engine "%s" does not exist.' % e.message)
+        bottle.abort(404, 'Search engine "%s" does not exist.' % e.message)
     search_engine = (config.create(search_engine)
                            .set_query_id(db_cid)
                            .set_query_params(request.query))
@@ -156,7 +157,6 @@ def v1_search_engines(search_engines):
     to a valid search engine. ``names`` is an array of all available
     search engines (including ``default``).
     '''
-    ## explain where search_engines comes from...
     return sorted(search_engines.keys())
 
 
@@ -498,7 +498,7 @@ def v1_folder_delete(request, response, kvlclient,
 
 
 @app.post('/dossier/v1/folder/<fid_src>/rename/<fid_dest>')
-@app.post('/dossier/v1/folder/<fid_src>/subfolder/<sfid_src>/rename/<fid_dest>/subfolder/<sfid_dest>')
+@app.post('/dossier/v1/folder/<fid_src>/subfolder/<sfid_src>/rename/<fid_dest>/subfolder/<sfid_dest>')  # noqa
 def v1_folder_rename(request, response, kvlclient,
                      fid_src, fid_dest, sfid_src=None, sfid_dest=None):
     src, dest = make_path(fid_src, sfid_src), make_path(fid_dest, sfid_dest)
@@ -539,6 +539,7 @@ def make_path(fid, sfid=None, cid=None, subid=None):
                 path.append(cid)
     return '/'.join(path)
 
+
 def folder_id_to_name(ident):
     return ident.replace('_', ' ')
 
@@ -549,8 +550,8 @@ def folder_name_to_id(name):
 
 def assert_valid_folder_id(ident):
     if ' ' in ident or '/' in ident:
-        bottle.abort(500,
-            "Folder ids cannot contain spaces or '/' characters.")
+        bottle.abort(
+            500, "Folder ids cannot contain spaces or '/' characters.")
 
 
 def get_annotator_id(request):

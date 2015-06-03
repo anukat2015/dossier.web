@@ -1,12 +1,13 @@
-'''dossier.web provides REST web services for Dossier Stack
+'''
+dossier.web provides REST web services for Dossier Stack
+========================================================
 
 .. This software is released under an MIT/X11 open source license.
    Copyright 2012-2014 Diffeo, Inc.
 
-.. autofunction:: dossier.web.get_application
+.. autofunction:: dossier.web.WebBuilder
 .. autofunction:: dossier.web.SearchEngine
 .. autofunction:: dossier.web.Filter
-.. autofunction:: dossier.web.Route
 
 Here are the available search engines by default:
 
