@@ -202,7 +202,8 @@ class SearchEngine(Queryable):
         return results
 
     # dbid_to_visid is temp hack
-    def json(self, dbid_to_visid=lambda x: x):
+    def respond(self, response, dbid_to_visid=lambda x: x):
+        response.content_type = 'application/json'
         return json.dumps(self.results(dbid_to_visid))
 
 

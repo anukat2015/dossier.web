@@ -141,8 +141,7 @@ def v1_search(request, response, visid_to_dbid, dbid_to_visid,
                            .set_query_params(request.query))
     for name, filter in filters.items():
         search_engine.add_filter(name, config.create(filter))
-    response.content_type = 'application/json'
-    return search_engine.json(dbid_to_visid)
+    return search_engine.respond(response, dbid_to_visid)
 
 
 @app.get('/dossier/v1/search_engines', json=True)
