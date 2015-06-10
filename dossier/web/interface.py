@@ -5,7 +5,7 @@ import json
 
 import bottle
 
-from dossier.fc import FeatureTokens, StringCounter
+from dossier.web import util
 
 
 class Queryable(object):
@@ -224,16 +224,6 @@ class Filter(Queryable):
         included in the list of recommendations provided to the user.
         '''
         raise NotImplementedError()
-
-
-def fc_to_json(fc):
-    d = {}
-    for name, feat in fc.iteritems():
-        if isinstance(feat, (unicode, StringCounter)):
-            d[name] = feat
-        elif isinstance(feat, FeatureTokens):
-            d[name] = feat.to_dict()
-    return d
 
 
 def as_multi_dict(d):

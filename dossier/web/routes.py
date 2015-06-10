@@ -83,11 +83,12 @@ import urlparse
 
 import bottle
 
-from dossier.fc import FeatureCollection, FeatureTokens, StringCounter
+from dossier.fc import FeatureCollection
 from dossier.label import Label, CorefValue
 from dossier.label.run import label_to_dict
 from dossier.web.folder import Folders
 from dossier.web.search_engines import streaming_sample
+from dossier.web import util
 import yakonfig
 
 
@@ -172,7 +173,7 @@ def v1_fc_get(visid_to_dbid, store, cid):
     fc = store.get(visid_to_dbid(cid))
     if fc is None:
         bottle.abort(404, 'Feature collection "%s" does not exist.' % cid)
-    return fc_to_json(fc)
+    return util.fc_to_json(fc)
 
 
 @app.put('/dossier/v1/feature-collection/<cid>')
@@ -216,7 +217,7 @@ def v1_random_fc_get(response, dbid_to_visid, store):
     sample = streaming_sample(store.scan_ids(), 1, 1000)
     if len(sample) == 0:
         bottle.abort(404, 'The feature collection store is empty.')
-    return [dbid_to_visid(sample[0]), fc_to_json(store.get(sample[0]))]
+    return [dbid_to_visid(sample[0]), util.fc_to_json(store.get(sample[0]))]
 
 
 @app.put('/dossier/v1/label/<cid1>/<cid2>/<annotator_id>')
@@ -565,16 +566,6 @@ def str_to_max_int(s, maximum):
         return min(maximum, int(s))
     except (ValueError, TypeError):
         return maximum
-
-
-def fc_to_json(fc):
-    d = {}
-    for name, feat in fc.iteritems():
-        if isinstance(feat, (unicode, StringCounter)):
-            d[name] = feat
-        elif isinstance(feat, FeatureTokens):
-            d[name] = feat.to_dict()
-    return d
 
 
 def make_ident(content_id, subtopic_id):
