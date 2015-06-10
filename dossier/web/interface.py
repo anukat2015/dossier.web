@@ -181,30 +181,28 @@ class SearchEngine(Queryable):
         '''
         raise NotImplementedError()
 
-    # dbid_to_visid is temp hack
-    def results(self, dbid_to_visid=lambda x: x):
+    def results(self):
         results = self.recommendations()
         transformed = []
         for t in results['results']:
             if len(t) == 2:
-                db_cid, fc = t
+                cid, fc = t
                 info = {}
             elif len(t) == 3:
-                db_cid, fc, info = t
+                cid, fc, info = t
             else:
                 bottle.abort(500, 'Invalid search result: "%r"' % t)
             result = info
-            result['content_id'] = dbid_to_visid(db_cid)
+            result['content_id'] = cid
             if not self.params['omit_fc']:
-                result['fc'] = fc_to_json(fc)
+                result['fc'] = util.fc_to_json(fc)
             transformed.append(result)
         results['results'] = transformed
         return results
 
-    # dbid_to_visid is temp hack
-    def respond(self, response, dbid_to_visid=lambda x: x):
+    def respond(self, response):
         response.content_type = 'application/json'
-        return json.dumps(self.results(dbid_to_visid))
+        return json.dumps(self.results())
 
 
 class Filter(Queryable):

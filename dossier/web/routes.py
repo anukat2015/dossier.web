@@ -102,8 +102,8 @@ def v1_static(name):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>')
-def v1_search(request, response, visid_to_dbid, dbid_to_visid,
-              config, search_engines, filters, cid, engine_name):
+def v1_search(request, response, visid_to_dbid, config,
+              search_engines, filters, cid, engine_name):
     '''Search feature collections.
 
     The route for this endpoint is:
@@ -141,7 +141,7 @@ def v1_search(request, response, visid_to_dbid, dbid_to_visid,
                            .set_query_params(request.query))
     for name, filter in filters.items():
         search_engine.add_filter(name, config.create(filter))
-    return search_engine.respond(response, dbid_to_visid)
+    return search_engine.respond(response)
 
 
 @app.get('/dossier/v1/search_engines', json=True)
