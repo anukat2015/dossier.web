@@ -26,7 +26,7 @@ setup(
     version=VERSION,
     description=DESC,
     license='MIT',
-    long_description=read_file('README.md'),
+    long_description=read_file('README.rst'),
     author=AUTHOR,
     author_email=AUTHOR_EMAIL,
     url=URL,
