@@ -2,16 +2,11 @@
 
 .. This software is released under an MIT/X11 open source license.
    Copyright 2012-2014 Diffeo, Inc.
-
 '''
 import functools
-import inspect
-import json
 import logging
 import threading
 import traceback
-
-import bottle
 
 from dossier.label import LabelStore
 from dossier.store import Store
@@ -50,13 +45,16 @@ def safe_service(attr, default_value=None):
 def thread_local_property(name):
     '''Creates a thread local ``property``.'''
     name = '_thread_local_' + name
+
     def fget(self):
         try:
             return getattr(self, name).value
         except AttributeError:
             return None
+
     def fset(self, value):
         getattr(self, name).value = value
+
     return property(fget=fget, fset=fset)
 
 
@@ -71,7 +69,6 @@ class Config(yakonfig.factory.AutoFactory):
     _THREAD_LOCALS = ['store', 'label_store', 'kvlclient']
     for n in _THREAD_LOCALS:
         locals()['_' + n] = thread_local_property(n)
-
 
     def __init__(self, *args, **kwargs):
         super(Config, self).__init__(*args, **kwargs)
@@ -127,63 +124,6 @@ class Config(yakonfig.factory.AutoFactory):
         if self._kvlclient is None:
             self._kvlclient = kvlayer.client()
         return self._kvlclient
-
-
-def create_injector(param_name, fun_param_value):
-    '''Dependency injection with Bottle.
-
-    This creates a simple dependency injector that will map
-    ``param_name`` in routes to the value ``fun_param_value()``
-    each time the route is invoked.
-
-    ``fun_param_value`` is a closure so that it is lazily evaluated.
-    This is useful for handling thread local services like database
-    connections.
-
-    :param str param_name: name of function parameter to inject into
-    :param fun_param_value: the value to insert
-    :type fun_param_value: a closure that can be applied with zero
-                           arguments
-    '''
-    class _(object):
-        api = 2
-
-        def apply(self, callback, route):
-            if param_name not in inspect.getargspec(route.callback)[0]:
-                return callback
-            def _(*args, **kwargs):
-                pval = fun_param_value()
-                if pval is None:
-                    logger.error('service "%s" unavailable', param_name)
-                    bottle.abort(503, 'service "%s" unavailable' % param_name)
-                    return
-                kwargs[param_name] = pval
-                return callback(*args, **kwargs)
-            return _
-    return _()
-
-
-class JsonPlugin(object):
-    '''A custom JSON plugin for Bottle.
-
-    Bottle has this functionality by default, but it is only triggered
-    when the return value of a route is a ``dict``. This permits the
-    programmer to write `json=True` into the route decorator, which
-    causes the response to *always* be JSON.
-
-    Basically, it just wraps the return value in ``json.dumps`` and
-    sets the HTTP content type header appropriately.
-    '''
-    api = 2
-    name = 'json_response'
-
-    def apply(self, callback, route):
-        if not route.config.get('json', False):
-            return callback
-        def _(*args, **kwargs):
-            bottle.response.content_type = 'application/json'
-            return json.dumps(callback(*args, **kwargs), indent=2)
-        return _
 
 
 def global_config(name):

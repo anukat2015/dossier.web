@@ -5,23 +5,23 @@ dossier.web provides REST web services for Dossier Stack
 .. This software is released under an MIT/X11 open source license.
    Copyright 2012-2014 Diffeo, Inc.
 
-.. autofunction:: dossier.web.WebBuilder
-.. autofunction:: dossier.web.SearchEngine
-.. autofunction:: dossier.web.Filter
+.. autoclass:: dossier.web.WebBuilder
 
 Here are the available search engines by default:
 
-.. autofunction:: dossier.web.engine_index_scan
-.. autofunction:: dossier.web.engine_random
+.. autoclass:: dossier.web.search_engines.plain_index_scan
+.. autoclass:: dossier.web.search_engines.random
 
 Here are the available filter predicates by default:
 
-.. autofunction:: dossier.web.filter_already_labeled
+.. autoclass:: dossier.web.filters.already_labeled
+.. autoclass:: dossier.web.filters.nilsimsa_near_duplicates
 
 Some useful utility functions.
 
 .. autofunction:: dossier.web.streaming_sample
 
+.. automodule:: dossier.web.interface
 .. automodule:: dossier.web.routes
 .. automodule:: dossier.web.folder
 '''

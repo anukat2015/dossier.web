@@ -1,3 +1,8 @@
+'''Foldering for Dossier Stack.
+
+.. This software is released under an MIT/X11 open source license.
+   Copyright 2012-2015 Diffeo, Inc.
+'''
 from __future__ import absolute_import, division, print_function
 
 from collections import namedtuple
@@ -216,7 +221,9 @@ class Folders(object):
                 stack.extend(reversed(list(child_items(item))))
 
     def fresh_inode(self):
-        start = lambda: long(time.time() * 1000)
+        def start():
+            return long(time.time() * 1000)
+
         for _ in xrange(10):
             inode = start()
             key = self.key(inode)

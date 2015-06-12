@@ -1,7 +1,13 @@
 '''
 Foldering support using :mod:`dossier.store` and :mod:`dossier.label`
 =====================================================================
+
+.. This software is released under an MIT/X11 open source license.
+   Copyright 2012-2015 Diffeo, Inc.
+
 .. autoclass:: Folders
+
+N.B. This is deprecated and should not be used.
 '''
 from __future__ import absolute_import, division, print_function
 
@@ -148,7 +154,6 @@ class Folders(object):
                 continue
             yield (folder['folder_id'], subfolder)
 
-
     def items(self, folder_id, subfolder_id, ann_id=None):
         '''Yields an unodered generator of items in a subfolder.
 
@@ -253,7 +258,8 @@ class Folders(object):
 
     def assert_valid_folder_id(self, ident):
         if ' ' in ident or '/' in ident:
-            raise ValueError("Folder ids cannot contain spaces or '/' characters.")
+            raise ValueError("Folder ids cannot contain spaces "
+                             "or '/' characters.")
 
     def wrap_folder_content_id(self, annotator_id, fid):
         prefix = urllib.quote(self.prefix, safe='~')

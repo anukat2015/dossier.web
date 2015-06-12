@@ -1,3 +1,8 @@
+'''A builder for constructing DossierStack web applications.
+
+.. This software is released under an MIT/X11 open source license.
+   Copyright 2012-2015 Diffeo, Inc.
+'''
 from __future__ import absolute_import, division, print_function
 
 import inspect
@@ -16,8 +21,46 @@ logger = logging.getLogger(__name__)
 
 
 class WebBuilder(object):
+    '''A builder for constructing DossierStack web applications.
+
+    DossierStack web services have a lot of knobs, so instead of a single
+    function with a giant list of parameters, we get a "builder" that
+    lets one mutably construct data for building a web application.
+
+    These "knobs" include, but are not limited to: adding routes or other
+    Bottle applications, injecting services into routes, setting a URL
+    prefix and adding filters and search engines.
+
+    .. automethod:: __init__
+    .. automethod:: get_app
+    .. automethod:: mount
+    .. automethod:: set_config
+    .. automethod:: add_search_engine
+    .. automethod:: add_filter
+    .. automethod:: add_routes
+    .. automethod:: inject
+    .. automethod:: enable_cors
+    '''
     def __init__(self, add_default_routes=True):
-        self.app = BottleAppFixScriptName()
+        '''Introduce a new builder.
+
+        You can use method chaining to configure your web application
+        options. e.g.,
+
+        .. code-block:: python
+
+            app = WebBuilder().enable_cors().get_app()
+            app.run()
+
+        This code will create a new Bottle web application that enables
+        CORS (Cross Origin Resource Sharing).
+
+        If ``add_default_routes`` is ``False``, then the default set of
+        routes in ``dossier.web.routes`` is not added. This is only useful
+        if you want to compose multiple Bottle applications constructed
+        through multiple instances of ``WebBuilder``.
+        '''
+        self.app = bottle.Bottle()
         self.search_engines = {
             'random': builtin_engines.random,
             'plain_index_scan': builtin_engines.plain_index_scan,
@@ -34,6 +77,13 @@ class WebBuilder(object):
         self.visid_to_dbid, self.dbid_to_visid = lambda x: x, lambda x: x
 
     def get_app(self):
+        '''Eliminate the builder by producing a new Bottle application.
+
+        This should be the final call in your method chain. It uses all
+        of the built up options to create a new Bottle application.
+
+        :rtype: :class:`bottle.Bottle`
+        '''
         if self.config is None:
             # If the user never sets a config instance, then just create
             # a default.
@@ -76,31 +126,97 @@ class WebBuilder(object):
         app = self.app
         self.app = None
         if self.mount_prefix is not None:
-            root = BottleAppFixScriptName()
+            root = bottle.Bottle()
             root.mount(self.mount_prefix, app)
             return root
         else:
             return app
 
     def mount(self, prefix):
+        '''Mount the application on to the given URL prefix.
+
+        :param str prefix: A URL prefixi
+        :rtype: :class:`WebBuilder`
+        '''
         self.mount_prefix = prefix
         return self
 
     def set_config(self, config_instance):
+        '''Set the config instance.
+
+        By default, this is an instance of :class:`dossier.web.Config`,
+        which provides services like ``kvlclient`` and
+        ``label_store``. Custom services should probably subclass
+        :class:`dossier.web.Config`, but it's not strictly necessary so
+        long as it provides the same set of services (which are used
+        for dependency injection into Bottle routes).
+
+        :param config_instance: A config instance.
+        :type config_instance: :class:`dossier.web.Config`
+        :rtype: :class:`WebBuilder`
+        '''
         self.config = config_instance
         return self
 
     def add_search_engine(self, name, engine):
+        '''Adds a search engine with the given name.
+
+        ``engine`` must be the **class** object rather than
+        an instance. The class *must* be a subclass of
+        :class:`dossier.web.SearchEngine`, which should provide a means
+        of obtaining recommendations given a query.
+
+        The ``engine`` must be a class so that its dependencies can be
+        injected when the corresponding route is executed by the user.
+
+        If ``engine`` is ``None``, then it removes a possibly existing
+        search engine named ``name``.
+
+        :param str name: The name of the search engine. This appears
+                         in the list of search engines provided to the
+                         user, and is how the search engine is invoked
+                         via REST.
+        :param engine: A search engine *class*.
+        :type engine: `type`
+        :rtype: :class:`WebBuilder`
+        '''
         if engine is None:
             self.search_engines.pop(name, None)
         self.search_engines[name] = engine
         return self
 
     def add_filter(self, name, filter):
+        '''Adds a filter with the given name.
+
+        ``filter`` must be the **class** object rather than
+        an instance. The class *must* be a subclass of
+        :class:`dossier.web.Filter`, which should provide a means
+        of creating a predicate function.
+
+        The ``filter`` must be a class so that its dependencies can be
+        injected when the corresponding route is executed by the user.
+
+        If ``filter`` is ``None``, then it removes a possibly existing
+        filter named ``name``.
+
+        :param str name: The name of the filter. This is how the search engine
+                         is invoked via REST.
+        :param engine: A filter *class*.
+        :type engine: `type`
+        :rtype: :class:`WebBuilder`
+        '''
+        if name is None:
+            self.filters.pop(name, None)
         self.filters[name] = filter
         return self
 
     def add_routes(self, routes):
+        '''Merges a Bottle application into this one.
+
+        :param routes: A Bottle application or a sequence of routes.
+        :type routes: :class:`bottle.Bottle` or `[bottle route]`.
+        :rtype: :class:`WebBuilder`
+        '''
         # Basically the same as `self.app.merge(routes)`, except this
         # changes the owner of the route so that plugins on `self.app`
         # apply to the routes given here.
@@ -112,10 +228,31 @@ class WebBuilder(object):
         return self
 
     def inject(self, name, closure):
+        '''Injects ``closure()`` into ``name`` parameters in routes.
+
+        This sets up dependency injection for parameters named ``name``.
+        When a route is invoked that has a parameter ``name``, then
+        ``closure()`` is passed as that parameter's value.
+
+        (The closure indirection is so the caller can control the time
+        of construction for objects. For example, you may want to check
+        the health of a database connection.)
+
+        :param str name: Parameter name.
+        :param function closure: A function with no parameters.
+        :rtype: :class:`WebBuilder`
+        '''
         self.app.install(create_injector(name, closure))
         return self
 
     def enable_cors(self):
+        '''Enables Cross Origin Resource Sharing.
+
+        This makes sure the necessary headers are set so that this
+        web application's routes can be accessed from other origins.
+
+        :rtype: :class:`WebBuilder`
+        '''
         def access_control_headers():
             bottle.response.headers['Access-Control-Allow-Origin'] = '*'
             bottle.response.headers['Access-Control-Allow-Methods'] = \
@@ -152,14 +289,6 @@ class WebBuilder(object):
         return self
 
 
-class BottleAppFixScriptName(bottle.Bottle):
-    def __call__(self, env, start):
-        script_name = env.get('HTTP_DOSSIER_SCRIPT_NAME')
-        if script_name is not None:
-            env['SCRIPT_NAME'] = script_name
-        return super(BottleAppFixScriptName, self).__call__(env, start)
-
-
 def create_injector(param_name, fun_param_value):
     '''Dependency injection with Bottle.
 
@@ -182,6 +311,7 @@ def create_injector(param_name, fun_param_value):
         def apply(self, callback, route):
             if param_name not in inspect.getargspec(route.callback)[0]:
                 return callback
+
             def _(*args, **kwargs):
                 pval = fun_param_value()
                 if pval is None:
@@ -211,6 +341,7 @@ class JsonPlugin(object):
     def apply(self, callback, route):
         if not route.config.get('json', False):
             return callback
+
         def _(*args, **kwargs):
             bottle.response.content_type = 'application/json'
             return json.dumps(callback(*args, **kwargs), indent=2)

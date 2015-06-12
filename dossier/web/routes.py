@@ -2,12 +2,12 @@
 Web service for active learning
 ===============================
 
+.. This software is released under an MIT/X11 open source license.
+   Copyright 2012-2015 Diffeo, Inc.
+
 dossier.web.routes is a REST stateful web service that can
 drive Dossier Stack's an active ranking models and user interface, as
 well as other search technologies.
-
-.. This software is released under an MIT/X11 open source license.
-   Copyright 2012-2014 Diffeo, Inc.
 
 There are only a few API end points. They provide searching, storage
 and retrieval of feature collections along with storage of ground
@@ -60,15 +60,13 @@ identifier can be obtained with ``NAME.replace(' ', '_')``.
 All web routes accept and return *identifiers* (so space characters are
 disallowed).
 
-(Currently, there is no simple way to modify the name of an existing
-folder or sub-folder. There is also no simple way to delete an existing
-folder or sub-folder.)
-
 .. autofunction:: v1_folder_list
 .. autofunction:: v1_folder_add
 .. autofunction:: v1_subfolder_list
 .. autofunction:: v1_subfolder_add
 .. autofunction:: v1_subtopic_list
+.. autofunction:: v1_folder_delete
+.. autofunction:: v1_folder_rename
 '''
 from __future__ import absolute_import, division, print_function
 from functools import partial
@@ -243,11 +241,6 @@ def v1_label_put(request, response, visid_to_dbid, config, label_hooks,
 
     This endpoint returns status ``201`` upon successful storage.
     Any existing labels with the given ids are overwritten.
-
-    After the label is stored, any label hooks passed via ``label_hooks``
-    are executed. Each label hook should satisfy
-    ``yakonfig.AutoFactory``. Once created, the label hook should be
-    a function of one parameter: a :class:`dossier.label.Label`.
     '''
     coref_value = CorefValue(int(request.body.read()))
     lab = Label(visid_to_dbid(cid1), visid_to_dbid(cid2),
@@ -255,12 +248,6 @@ def v1_label_put(request, response, visid_to_dbid, config, label_hooks,
                 subtopic_id1=request.query.get('subtopic_id1'),
                 subtopic_id2=request.query.get('subtopic_id2'))
     label_store.put(lab)
-
-    # Run our hooks
-    for label_hook_configurable in label_hooks:
-        label_hook = config.create(label_hook_configurable)
-        label_hook(lab)
-
     response.status = 201
 
 
@@ -493,14 +480,31 @@ def v1_subtopic_list(request, response, kvlclient, fid, sfid):
 @app.delete('/dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>')
 def v1_folder_delete(request, response, kvlclient,
                      fid, sfid=None, cid=None, subid=None):
+    '''Deletes a folder, subfolder or item.
+
+    The routes for this endpoint are:
+
+    * ``DELETE /dossier/v1/folder/<fid>``
+    * ``DELETE /dossier/v1/folder/<fid>/subfolder/<sfid>``
+    * ``DELETE /dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>``
+    * ``DELETE /dossier/v1/folder/<fid>/subfolder/<sfid>/<cid>/<subid>``
+    '''
     new_folders(kvlclient, request).delete(make_path(fid, sfid, cid, subid))
-    response.status = 200
+    response.status = 204
 
 
 @app.post('/dossier/v1/folder/<fid_src>/rename/<fid_dest>')
 @app.post('/dossier/v1/folder/<fid_src>/subfolder/<sfid_src>/rename/<fid_dest>/subfolder/<sfid_dest>')  # noqa
 def v1_folder_rename(request, response, kvlclient,
                      fid_src, fid_dest, sfid_src=None, sfid_dest=None):
+    '''Rename a folder or a subfolder.
+
+    The routes for this endpoint are:
+
+    * ``POST /dossier/v1/<fid_src>/rename/<fid_dest>``
+    * ``POST /dossier/v1/<fid_src>/subfolder/<sfid_src>/rename/
+      <fid_dest>/subfolder/<sfid_dest>``
+    '''
     src, dest = make_path(fid_src, sfid_src), make_path(fid_dest, sfid_dest)
     new_folders(kvlclient, request).move(src, dest)
     response.status = 200
