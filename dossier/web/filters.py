@@ -5,12 +5,14 @@
 '''
 from __future__ import absolute_import, division, print_function
 from itertools import product
+import logging
 
 import nilsimsa
 
 from dossier.fc import FeatureCollection, StringCounter
 from dossier.web.interface import Filter
 
+logger = logging.getLogger(__name__)
 
 class already_labeled(Filter):
     '''Filter results that have a label associated with them.
@@ -26,6 +28,58 @@ class already_labeled(Filter):
         labeled = self.label_store.directly_connected(self.query_content_id)
         labeled_cids = set(lab.other(self.query_content_id) for lab in labeled)
         return lambda (cid, _): cid not in labeled_cids
+
+
+
+class geotime(Filter):
+    '''Filter results for GeoCoords features within the bounding box.
+    '''
+    param_schema = dict(Filter.param_schema, **{
+        'min_lat': {'type': 'float'},
+        'max_lat': {'type': 'float'},
+        'min_lon': {'type': 'float'},
+        'max_lon': {'type': 'float'},
+        'min_alt': {'type': 'float'},
+        'max_alt': {'type': 'float'},
+        'min_time': {'type': 'float'},
+        'max_time': {'type': 'float'},
+    })
+
+    def __init__(self, geotime_feature_name='!co_LOC'):
+        self.geotime_feature_name = geotime_feature_name
+
+    def create_predicate(self):
+        dim_names = ['lon', 'lat', 'alt', 'time']
+        min_dim = [self.params.get('min_' + dname)
+                   for dname in dim_names]
+        max_dim = [self.params.get('max_' + dname)
+                   for dname in dim_names]
+        if all(map(lambda x: x is None, min_dim + max_dim)):
+            return lambda _: True
+
+        def in_bbox(coords):
+            '''check each dimension, require values when filter is active in any
+            of the dimensions
+
+            '''
+            for d in range(4):
+                if min_dim[d] is not None:
+                    if coords[d] is None or coords[d] < min_dim[d]:
+                        return False
+                if max_dim[d] is not None:
+                    if coords[d] is None or coords[d] > max_dim[d]:
+                        return False
+            return True
+
+        def pred((cid, fc)):
+            feature = fc.get(self.geotime_feature_name, {})
+            for _, coords in feature.iteritems():
+                for coord in coords:
+                    if in_bbox(coord): return True
+            return False # no data passed filter
+
+        return pred
+
 
 
 class nilsimsa_near_duplicates(Filter):
@@ -76,6 +130,8 @@ class nilsimsa_near_duplicates(Filter):
         self.store = store
         self.nilsimsa_feature_name = nilsimsa_feature_name
         self.threshold = threshold
+        logger.info('nilsimsa_feature_name=%r and threshold=%r', 
+                    nilsimsa_feature_name, threshold)
 
     def create_predicate(self):
         query_fc = self.get_query_fc()

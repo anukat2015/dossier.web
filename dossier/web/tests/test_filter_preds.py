@@ -10,11 +10,12 @@ import random
 import string
 import time
 
-from dossier.fc import FeatureCollection, StringCounter
+from dossier.fc import FeatureCollection as FC
+from dossier.fc import FeatureCollection, StringCounter, GeoCoords
 from nilsimsa import Nilsimsa
 
 from dossier.web.tests import kvl, store, label_store
-from dossier.web.filters import nilsimsa_near_duplicates
+from dossier.web.filters import nilsimsa_near_duplicates, geotime
 
 
 def nilsimsa_hash(text):
@@ -145,3 +146,26 @@ def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=5,
     print '%d filtered to %d in %f seconds, %f per second' % (
         len(fcs), len(results), elapsed, len(fcs) / elapsed)
     assert len(results) == num_texts - 1 # minus the query
+
+
+def test_geotime_filter():
+    gc1 = GeoCoords({'foo': [(10, 10, 10, None)]})
+    gc2 = GeoCoords({'foo': [(10, 10, 10, None), (-10, 10, 10, 10)]})
+    gc3 = GeoCoords({'foo': [(-10, 10, 10, None), (10, 10, 10, 10)]})
+
+    fc1 = FC()
+    fc1['!co_LOC'] = gc1
+    fc2 = FC()
+    fc2['!co_LOC'] = gc2
+    fc3 = FC()
+    fc3['!co_LOC'] = gc3
+
+    gt = geotime()
+    gt.params = dict(min_lat=0, max_lat=20,
+                     min_lon=-20, max_lon=0,
+                     min_time=0)
+    pred = gt.create_predicate()
+
+    results = filter(pred, [('', fc1), ('', fc2), ('', fc3)])
+    assert len(results) == 1
+    assert results[0][1] == fc2
