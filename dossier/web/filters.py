@@ -14,6 +14,7 @@ from dossier.web.interface import Filter
 
 logger = logging.getLogger(__name__)
 
+
 class already_labeled(Filter):
     '''Filter results that have a label associated with them.
 
@@ -30,37 +31,36 @@ class already_labeled(Filter):
         return lambda (cid, _): cid not in labeled_cids
 
 
-
 class geotime(Filter):
-    '''Filter results for GeoCoords features within the bounding box.
-    '''
+    '''Filter results for GeoCoords features within the bounding box.'''
     param_schema = dict(Filter.param_schema, **{
-        'min_lat': {'type': 'float'},
-        'max_lat': {'type': 'float'},
-        'min_lon': {'type': 'float'},
-        'max_lon': {'type': 'float'},
-        'min_alt': {'type': 'float'},
-        'max_alt': {'type': 'float'},
-        'min_time': {'type': 'float'},
-        'max_time': {'type': 'float'},
+        'min_lat': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'max_lat': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'min_lon': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'max_lon': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'min_alt': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'max_alt': {'type': 'float', 'min': -360.0, 'max': 360.0},
+        'min_time': {'type': 'float', 'min': 0, 'max': (2 ** 32) - 1},
+        'max_time': {'type': 'float', 'min': 0, 'max': (2 ** 32) - 1},
     })
 
     def __init__(self, geotime_feature_name='!co_LOC'):
+        super(geotime, self).__init__()
         self.geotime_feature_name = geotime_feature_name
 
     def create_predicate(self):
         dim_names = ['lon', 'lat', 'alt', 'time']
-        min_dim = [self.params.get('min_' + dname)
-                   for dname in dim_names]
-        max_dim = [self.params.get('max_' + dname)
-                   for dname in dim_names]
+        min_dim = [self.params['min_' + dname] for dname in dim_names]
+        max_dim = [self.params['max_' + dname] for dname in dim_names]
+        print(self.params)
         if all(map(lambda x: x is None, min_dim + max_dim)):
             return lambda _: True
 
         def in_bbox(coords):
-            '''check each dimension, require values when filter is active in any
-            of the dimensions
+            '''Checks each dimension.
 
+            Require values when filter is active in any of the
+            dimensions.
             '''
             for d in range(4):
                 if min_dim[d] is not None:
@@ -75,11 +75,11 @@ class geotime(Filter):
             feature = fc.get(self.geotime_feature_name, {})
             for _, coords in feature.iteritems():
                 for coord in coords:
-                    if in_bbox(coord): return True
-            return False # no data passed filter
+                    if in_bbox(coord):
+                        return True
+            return False  # no data passed filter
 
         return pred
-
 
 
 class nilsimsa_near_duplicates(Filter):
@@ -130,7 +130,7 @@ class nilsimsa_near_duplicates(Filter):
         self.store = store
         self.nilsimsa_feature_name = nilsimsa_feature_name
         self.threshold = threshold
-        logger.info('nilsimsa_feature_name=%r and threshold=%r', 
+        logger.info('nilsimsa_feature_name=%r and threshold=%r',
                     nilsimsa_feature_name, threshold)
 
     def create_predicate(self):

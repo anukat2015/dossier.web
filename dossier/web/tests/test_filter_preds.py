@@ -145,7 +145,7 @@ def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=5,
     elapsed = time.time() - start
     print '%d filtered to %d in %f seconds, %f per second' % (
         len(fcs), len(results), elapsed, len(fcs) / elapsed)
-    assert len(results) == num_texts - 1 # minus the query
+    assert len(results) == num_texts - 1  # minus the query
 
 
 def test_geotime_filter():
@@ -160,11 +160,11 @@ def test_geotime_filter():
     fc3 = FC()
     fc3['!co_LOC'] = gc3
 
-    gt = geotime()
-    gt.params = dict(min_lat=0, max_lat=20,
-                     min_lon=-20, max_lon=0,
-                     min_time=0)
-    pred = gt.create_predicate()
+    pred = geotime().set_query_params({
+        'min_lat': 0, 'max_lat': 20,
+        'min_lon': -20, 'max_lon': 0,
+        'min_time': 0,
+    }).create_predicate()
 
     results = filter(pred, [('', fc1), ('', fc2), ('', fc3)])
     assert len(results) == 1
