@@ -5,7 +5,8 @@
 '''
 from __future__ import absolute_import, division, print_function
 
-from dossier.fc import FeatureCollection, FeatureTokens, StringCounter
+from dossier.fc import \
+    FeatureCollection, FeatureTokens, StringCounter, GeoCoords
 
 
 def fc_to_json(fc):
@@ -17,6 +18,6 @@ def fc_to_json(fc):
     for name, feat in fc.iteritems():
         if isinstance(feat, (unicode, StringCounter, dict)):
             d[name] = feat
-        elif isinstance(feat, FeatureTokens):
+        elif isinstance(feat, (FeatureTokens, GeoCoords)):
             d[name] = feat.to_dict()
     return d
