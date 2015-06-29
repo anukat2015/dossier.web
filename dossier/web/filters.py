@@ -4,12 +4,12 @@
    Copyright 2015 Diffeo, Inc.
 '''
 from __future__ import absolute_import, division, print_function
-from itertools import product
+from itertools import chain, imap, product
 import logging
 
 import nilsimsa
 
-from dossier.fc import FeatureCollection, StringCounter
+from dossier.fc import FeatureCollection as FC, StringCounter
 from dossier.web.interface import Filter
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,8 @@ class geotime(Filter):
         'max_time': {'type': 'float', 'min': 0, 'max': (2 ** 32) - 1},
     })
 
-    def __init__(self, geotime_feature_name='!co_LOC'):
+    def __init__(self,
+                 geotime_feature_name=FC.GEOCOORDS_PREFIX + 'both_co_LOC_1'):
         super(geotime, self).__init__()
         self.geotime_feature_name = geotime_feature_name
 
@@ -52,8 +53,7 @@ class geotime(Filter):
         dim_names = ['lon', 'lat', 'alt', 'time']
         min_dim = [self.params['min_' + dname] for dname in dim_names]
         max_dim = [self.params['max_' + dname] for dname in dim_names]
-        print(self.params)
-        if all(map(lambda x: x is None, min_dim + max_dim)):
+        if all(x is None for x in chain(min_dim, max_dim)):
             return lambda _: True
 
         def in_bbox(coords):
@@ -73,11 +73,8 @@ class geotime(Filter):
 
         def pred((cid, fc)):
             feature = fc.get(self.geotime_feature_name, {})
-            for _, coords in feature.iteritems():
-                for coord in coords:
-                    if in_bbox(coord):
-                        return True
-            return False  # no data passed filter
+            return any(any(imap(in_bbox, coords))
+                       for _, coords in feature.iteritems())
 
         return pred
 
@@ -180,7 +177,7 @@ def get_string_counter(fc, feature_name):
 
     '''
     if feature_name not in fc:
-        feature = fc.get(FeatureCollection.DISPLAY_PREFIX + feature_name)
+        feature = fc.get(FC.DISPLAY_PREFIX + feature_name)
     else:
         feature = fc.get(feature_name)
     if isinstance(feature, StringCounter):
