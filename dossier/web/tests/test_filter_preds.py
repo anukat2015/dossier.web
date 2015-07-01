@@ -14,7 +14,7 @@ from dossier.fc import FeatureCollection as FC
 from dossier.fc import FeatureCollection, StringCounter, GeoCoords
 from nilsimsa import Nilsimsa
 
-from dossier.web.tests import kvl, store, label_store
+from dossier.web.tests import kvl, store, label_store  # noqa
 from dossier.web.filters import nilsimsa_near_duplicates, geotime
 
 
@@ -42,8 +42,9 @@ def make_fc(text):
 candidate_chars = (
     string.ascii_lowercase + string.ascii_uppercase + string.digits
 )
-## make whitespaces appear approx 1/7 times
+# make whitespaces appear approx 1/7 times
 candidate_chars += ' ' * (len(candidate_chars) / 7)
+
 
 def random_text(N=3500):
     '''generate a random text of length N
@@ -64,7 +65,7 @@ def mutate(text, N=1):
     return ''.join(new_text)
 
 
-@pytest.mark.skipif('1') ## no need to run this
+@pytest.mark.skipif('1')  # no need to run this
 @pytest.mark.xfail
 def test_nilsimsa_exact_match():
     '''check that even though Nilsimsa has 256 bits to play with, you can
@@ -79,7 +80,7 @@ def test_nilsimsa_exact_match():
             assert nilsimsa_hash(text0) != nilsimsa_hash(text1)
 
 
-def test_nilsimsa_near_duplicates_basic(label_store, store):
+def test_nilsimsa_near_duplicates_basic(label_store, store):  # noqa
 
     fcs = [(str(idx), make_fc(text))
            for idx, text in enumerate(near_duplicate_texts)]
@@ -89,13 +90,13 @@ def test_nilsimsa_near_duplicates_basic(label_store, store):
 
     accumulating_predicate = nilsimsa_near_duplicates(
         label_store, store,
-        ## lower threshold for short test strings
+        # lower threshold for short test strings
         threshold=0).set_query_id(query_content_id).create_predicate()
 
     assert len(filter(accumulating_predicate, fcs)) == 0
 
 
-def test_nilsimsa_near_duplicates_update_logic(label_store, store):
+def test_nilsimsa_near_duplicates_update_logic(label_store, store):  # noqa
     fcs = [(str(idx), make_fc(text))
            for idx, text in enumerate(chain(*repeat(near_duplicate_texts,
                                                     1000)))]
@@ -106,7 +107,7 @@ def test_nilsimsa_near_duplicates_update_logic(label_store, store):
 
     accumulating_predicate = nilsimsa_near_duplicates(
         label_store, store,
-        ## lower threshold for short test strings
+        # lower threshold for short test strings
         threshold=120).set_query_id(query_content_id).create_predicate()
 
     start = time.time()
@@ -117,11 +118,13 @@ def test_nilsimsa_near_duplicates_update_logic(label_store, store):
     assert len(results) == 3
 
 
-## speed perf numbers in nilsimsa_near_duplicates doc string come from
-## hand editing the kwargs in this:
-def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=5,
-                                             num_exact_dups_each=10,
-                                             num_near_dups_each=10):
+# speed perf numbers in nilsimsa_near_duplicates doc string come from
+# hand editing the kwargs in this:
+def test_nilsimsa_near_duplicates_speed_perf(  # noqa
+    label_store, store, num_texts=5,
+    num_exact_dups_each=10,
+    num_near_dups_each=10,
+):
     different_texts = [random_text() for _ in range(num_texts)]
 
     fcs = []
@@ -149,16 +152,17 @@ def test_nilsimsa_near_duplicates_speed_perf(label_store, store, num_texts=5,
 
 
 def test_geotime_filter():
+    fname = '!both_co_LOC_1'
     gc1 = GeoCoords({'foo': [(10, 10, 10, None)]})
     gc2 = GeoCoords({'foo': [(10, 10, 10, None), (-10, 10, 10, 10)]})
     gc3 = GeoCoords({'foo': [(-10, 10, 10, None), (10, 10, 10, 10)]})
 
     fc1 = FC()
-    fc1['!co_LOC'] = gc1
+    fc1[fname] = gc1
     fc2 = FC()
-    fc2['!co_LOC'] = gc2
+    fc2[fname] = gc2
     fc3 = FC()
-    fc3['!co_LOC'] = gc3
+    fc3[fname] = gc3
 
     pred = geotime().set_query_params({
         'min_lat': 0, 'max_lat': 20,
