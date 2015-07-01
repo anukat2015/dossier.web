@@ -18,6 +18,13 @@ def fc_to_json(fc):
     for name, feat in fc.iteritems():
         if isinstance(feat, (unicode, StringCounter, dict)):
             d[name] = feat
-        elif isinstance(feat, (FeatureTokens, GeoCoords)):
+        elif isinstance(feat, FeatureTokens):
+            d[name] = feat.to_dict()
+        elif is_filterable_geo_feature(name, feat):
             d[name] = feat.to_dict()
     return d
+
+
+def is_filterable_geo_feature(name, feat):
+    want = FeatureCollection.GEOCOORDS_PREFIX + 'both_co_LOC_1'
+    return isinstance(feat, GeoCoords) and name == want
