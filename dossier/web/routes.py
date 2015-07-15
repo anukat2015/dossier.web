@@ -101,6 +101,7 @@ def v1_static(name):
 
 
 @app.get('/dossier/v1/feature-collection/<cid>/search/<engine_name>')
+@app.post('/dossier/v1/feature-collection/<cid>/search/<engine_name>')
 def v1_search(request, response, visid_to_dbid, config,
               search_engines, filters, cid, engine_name):
     '''Search feature collections.
@@ -135,9 +136,10 @@ def v1_search(request, response, visid_to_dbid, config,
         search_engine = search_engines[engine_name]
     except KeyError as e:
         bottle.abort(404, 'Search engine "%s" does not exist.' % e.message)
+    query = request.query if request.method == 'GET' else request.forms
     search_engine = (config.create(search_engine)
                            .set_query_id(db_cid)
-                           .set_query_params(request.query))
+                           .set_query_params(query))
     for name, filter in filters.items():
         search_engine.add_filter(name, config.create(filter))
     return search_engine.respond(response)
