@@ -46,6 +46,7 @@ setup(
         'kvlayer >= 0.5.7',
         'pytest',
         'nilsimsa >= 0.3.4',
+        'regex',
         'uwsgi >= 2',
         'yakonfig >= 0.7.2',
     ],
