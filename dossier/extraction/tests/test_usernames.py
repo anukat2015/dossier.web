@@ -1,6 +1,10 @@
 from __future__ import absolute_import
 import pytest
 
+from dossier.fc import StringCounter
+
+from dossier.extraction import usernames
+
 example_usernames_from_paths = [
      (r'http://www.example.com/user/folder3/index.html?source=dummy', 'folder3', 3),
      (r'http://www.example.com/user/myaccount', 'myaccount', 2),
@@ -41,14 +45,6 @@ def test_usernames(url_or_path, username, count):
     urls[url_or_path] += count
 
     if username is not None:
-        results = features.usernames(urls)
+        results = usernames(urls)
         assert results == StringCounter({username: count})
 
-def test_entity_names(example_fc, nltk_data):
-    '''test for the `entity_names` transform
-    '''
-    xform = features.entity_names()
-    fc = xform.process(example_fc)
-    assert u'PERSON' in fc, fc.keys()
-    assert u'craig winton' in fc[u'PERSON']
-    #print(json.dumps(dict(fc), indent=4))
