@@ -9,7 +9,7 @@ import threading
 import traceback
 
 from dossier.label import LabelStore
-from dossier.store import Store
+from dossier.store import ElasticStore
 import kvlayer
 import yakonfig
 import yakonfig.factory
@@ -93,7 +93,7 @@ class Config(yakonfig.factory.AutoFactory):
 
     @property
     def auto_config(self):
-        return [Store, LabelStore]
+        return [ElasticStore, LabelStore]
 
     @property
     @safe_service('_store')
@@ -101,7 +101,7 @@ class Config(yakonfig.factory.AutoFactory):
         '''Return a thread local :class:`dossier.store.Store` client.'''
         if self._store is None:
             config = global_config('dossier.store')
-            self._store = self.create(Store, config=config)
+            self._store = self.create(ElasticStore, config=config)
         return self._store
 
     @property
