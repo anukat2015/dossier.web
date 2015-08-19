@@ -37,8 +37,8 @@ class random(SearchEngine):
         if fc is None:
             raise KeyError(self.query_content_id)
         cids = []
-        for name in fc.get(u'NAME'):
-            cids.extend(self.store.index_scan(u'NAME', name))
+        for name in fc.get(u'NAME', {}):
+            cids.extend(self.store.index_scan_ids(u'NAME', name))
         predicate = self.create_filter_predicate()
         results = list(ifilter(predicate, self.store.get_many(cids)))
         rand.shuffle(results)

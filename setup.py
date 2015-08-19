@@ -45,6 +45,7 @@ setup(
         'dossier.store >= 0.3.1',
         'kvlayer >= 0.5.7',
         'pytest',
+        'pytest-diffeo',
         'nilsimsa >= 0.3.4',
         'regex',
         'uwsgi >= 2',

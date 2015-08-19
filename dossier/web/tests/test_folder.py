@@ -6,10 +6,10 @@ from dossier.web.folder import \
     Folders, InodeCreationError, NotDirectoryError, \
     RootDeleteError, RootMoveError, \
     PathExistsError, StemNotItemError
-from dossier.web.tests import kvl
+from dossier.web.tests import config_local, kvl  # noqa
 
 
-@pytest.yield_fixture
+@pytest.yield_fixture  # noqa
 def folders(kvl):
     yield Folders(kvl)
 

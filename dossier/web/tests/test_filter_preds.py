@@ -14,7 +14,7 @@ from dossier.fc import FeatureCollection as FC
 from dossier.fc import FeatureCollection, StringCounter, GeoCoords
 from nilsimsa import Nilsimsa
 
-from dossier.web.tests import kvl, store, label_store  # noqa
+from dossier.web.tests import config_local, kvl, store, label_store  # noqa
 from dossier.web.filters import nilsimsa_near_duplicates, geotime
 
 

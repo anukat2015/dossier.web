@@ -3,15 +3,15 @@ from __future__ import absolute_import, division, print_function
 import pytest
 
 from dossier.web.label_folders import Folders
-from dossier.web.tests import kvl, store, label_store
+from dossier.web.tests import config_local, kvl, store, label_store  # noqa
 
 
-@pytest.yield_fixture
+@pytest.yield_fixture  # noqa
 def folders(store, label_store):
     yield Folders(store, label_store)
 
 
-@pytest.yield_fixture
+@pytest.yield_fixture  # noqa
 def folders_prefix(store, label_store):
     yield Folders(store, label_store, prefix='foo')
 

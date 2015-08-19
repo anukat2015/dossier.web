@@ -8,7 +8,7 @@ import bottle
 
 from dossier.fc import FeatureCollection
 import dossier.web.routes as routes
-from dossier.web.tests import kvl, store, label_store
+from dossier.web.tests import config_local, kvl, store, label_store  # noqa
 
 
 def rot14(s):
@@ -38,7 +38,7 @@ def new_response():
     return bottle.Response()
 
 
-def test_fc_put(store):
+def test_fc_put(store):  # noqa
     req = new_request(body=json.dumps({'foo': {'a': 1}}))
     resp = new_response()
     routes.v1_fc_put(req, resp, visid_to_dbid, store, 'abc')
@@ -46,7 +46,7 @@ def test_fc_put(store):
     assert store.get(visid_to_dbid('abc'))['foo']['a'] == 1
 
 
-def test_fc_get(store):
+def test_fc_get(store):  # noqa
     store.put([(visid_to_dbid('abc'), FeatureCollection({'foo': {'a': 1}}))])
     fc = routes.v1_fc_get(dbid_to_visid, store, 'abc')
     assert fc['foo']['a'] == 1
