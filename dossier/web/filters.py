@@ -122,7 +122,7 @@ class nilsimsa_near_duplicates(Filter):
     dossier/web/tests/test_filter_preds.py::test_nilsimsa_near_duplicates_speed_perf 209 filtered to 9 in 0.009230 seconds, 22643.802754 per second
     '''
     def __init__(self, label_store, store,
-                 nilsimsa_feature_name='nilsimsa_all', threshold=119):
+                 nilsimsa_feature_name='#nilsimsa_all', threshold=0.9):
         self.label_store = label_store
         self.store = store
         self.nilsimsa_feature_name = nilsimsa_feature_name
@@ -154,6 +154,7 @@ class nilsimsa_near_duplicates(Filter):
             for hash1, hash2 in product(sim_feature, accumulator):
                 score = nilsimsa.compare_digests(hash1, hash2,
                                                  threshold=self.threshold)
+                score /= 128.0
                 if score > self.threshold:
                     # near duplicate, so filter and do not accumulate
                     return False
