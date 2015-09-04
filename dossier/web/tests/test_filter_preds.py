@@ -141,7 +141,7 @@ def test_nilsimsa_near_duplicates_speed_perf(  # noqa
     store.put([(query_content_id, query_fc)])
     accumulating_predicate = nilsimsa_near_duplicates(
         label_store, store,
-        threshold=100).set_query_id(query_content_id).create_predicate()
+        threshold=0.85).set_query_id(query_content_id).create_predicate()
 
     start = time.time()
     results = filter(accumulating_predicate, fcs)
