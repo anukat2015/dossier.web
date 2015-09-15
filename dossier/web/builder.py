@@ -15,6 +15,7 @@ from dossier.web import search_engines as builtin_engines
 from dossier.web.config import Config
 from dossier.web.filters import already_labeled
 from dossier.web.routes import app as default_app
+from dossier.web.tags import app as tags_app
 
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,7 @@ class WebBuilder(object):
         self.config = None
         if add_default_routes:
             self.add_routes(default_app)
+            self.add_routes(tags_app)
 
         # DEPRECATED. Remove. ---AG
         self.visid_to_dbid, self.dbid_to_visid = lambda x: x, lambda x: x
@@ -95,6 +97,7 @@ class WebBuilder(object):
         self.inject('kvlclient', lambda: self.config.kvlclient)
         self.inject('store', lambda: self.config.store)
         self.inject('label_store', lambda: self.config.label_store)
+        self.inject('tags', lambda: self.config.tags)
         self.inject('search_engines', lambda: self.search_engines)
         self.inject('filters', lambda: self.filters)
         self.inject('request', lambda: bottle.request)

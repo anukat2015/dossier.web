@@ -10,6 +10,7 @@ import traceback
 
 from dossier.label import LabelStore
 from dossier.store import ElasticStore
+from dossier.web.tags import Tags
 import kvlayer
 import yakonfig
 import yakonfig.factory
@@ -66,7 +67,7 @@ class Config(yakonfig.factory.AutoFactory):
     .. autoattribute:: dossier.web.Config.store
     .. autoattribute:: dossier.web.Config.label_store
     '''
-    _THREAD_LOCALS = ['store', 'label_store', 'kvlclient']
+    _THREAD_LOCALS = ['store', 'label_store', 'kvlclient', 'tags']
     for n in _THREAD_LOCALS:
         locals()['_' + n] = thread_local_property(n)
 
@@ -94,6 +95,15 @@ class Config(yakonfig.factory.AutoFactory):
     @property
     def auto_config(self):
         return [ElasticStore, LabelStore]
+
+    @property
+    @safe_service('_tags')
+    def tags(self):
+        'Return a thread local :class:`dossier.web.Tags` client.'
+        if self._tags is None:
+            config = global_config('dossier.tags')
+            self._tags = self.create(Tags, config=config)
+        return self._tags
 
     @property
     @safe_service('_store')
