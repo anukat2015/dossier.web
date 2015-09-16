@@ -1,4 +1,6 @@
-'''Tagging for Dossier Stack.
+'''
+Tagging for Dossier Stack
+=========================
 
 .. This software is released under an MIT/X11 open source license.
    Copyright 2012-2015 Diffeo, Inc.
@@ -9,6 +11,13 @@ hierarchical tagging service with support for fast auto-completion.
 There are three flavors of routes: associate a tag with an object in
 an HTML document, list tags given a parent tag and list associations
 given some attribute (e.g., a tag or a stream id or a URL).
+
+.. autofunction:: v1_tag_associate
+.. autofunction:: v1_tag_list
+.. autofunction:: v1_tag_suggest
+.. autofunction:: v1_stream_id_associations
+.. autofunction:: v1_url_associations
+.. autofunction:: v1_tag_associations
 '''
 from __future__ import absolute_import, division, print_function
 
@@ -90,7 +99,7 @@ def v1_tag_suggest(request, tags, prefix, parent=''):
     ``fob/bob``, here are some example completions (ordering may be
     different):
 
-    .. code-block::
+    .. code-block:: text
 
         /dossier/v1/tags/suggest/prefix/f => ['foo', 'fob']
         /dossier/v1/tags/suggest/prefix/foo => ['foo']
@@ -101,7 +110,7 @@ def v1_tag_suggest(request, tags, prefix, parent=''):
     N.B. Each of the lists above are wrapped in the following
     JSON envelope for the response:
 
-    .. code-block::
+    .. code-block:: text
 
         {'suggestions': ['foo', 'fob']}
 

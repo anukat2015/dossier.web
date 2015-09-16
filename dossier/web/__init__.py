@@ -24,6 +24,7 @@ Some useful utility functions.
 .. automodule:: dossier.web.interface
 .. automodule:: dossier.web.routes
 .. automodule:: dossier.web.folder
+.. automodule:: dossier.web.tags
 '''
 from dossier.web.builder import WebBuilder, add_cli_arguments
 from dossier.web.config import Config
