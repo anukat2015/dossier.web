@@ -25,7 +25,7 @@ def visid_to_dbid(s):
 
 
 def new_request(params=None, body=None):
-    environ = {}
+    environ = {'wsgi.input': StringIO('')}
     if params is not None:
         environ['QUERY_STRING'] = urllib.urlencode(params)
     if body is not None:
