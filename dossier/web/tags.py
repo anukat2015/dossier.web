@@ -437,7 +437,8 @@ class Tags(object):
                 },
             },
         }
-        results = self.conn.search(index=self.index, doc_type=ty, body=query)
+        results = self.conn.search(index=self.index, doc_type=ty, body=query,
+                                   size=1000)
         return map(lambda r: r['_source'], results['hits']['hits'])
 
 
