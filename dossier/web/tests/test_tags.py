@@ -45,6 +45,25 @@ def test_tag_associate(tags):
     assert tags.list(u'foo/bar') == [{
         'tag': 'foo/bar/baz', 'name': 'baz', 'parent': 'foo/bar',
     }]
+    tagged = dict(DUMMY_ASSOC, **{u'tag': u'foo/bar/baz'})
+    assert tags.assocs_by_tag(u'foo/bar/baz') == [tagged]
+
+
+def test_tag_associate_twice(tags):
+    req = new_request(body=json.dumps(DUMMY_ASSOC))
+    tag_routes.v1_tag_associate(req, tags, 'foo/bar/baz')
+    tag_routes.v1_tag_associate(req, tags, 'foo/bar/baz')
+    assert tags.list(u'') == [{
+        'tag': 'foo', 'name': 'foo', 'parent': '',
+    }]
+    assert tags.list(u'foo') == [{
+        'tag': 'foo/bar', 'name': 'bar', 'parent': 'foo',
+    }]
+    assert tags.list(u'foo/bar') == [{
+        'tag': 'foo/bar/baz', 'name': 'baz', 'parent': 'foo/bar',
+    }]
+    tagged = dict(DUMMY_ASSOC, **{u'tag': u'foo/bar/baz'})
+    assert tags.assocs_by_tag(u'foo/bar/baz') == [tagged, tagged]
 
 
 def test_tag_associate_no_validate(tags):

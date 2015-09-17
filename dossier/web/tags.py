@@ -25,7 +25,7 @@ import json
 import logging
 
 import bottle
-from elasticsearch import Elasticsearch, TransportError
+from elasticsearch import ConflictError, Elasticsearch, TransportError
 import yakonfig
 
 
@@ -202,17 +202,26 @@ class Tags(object):
         self.conn.create(
             index=self.index, doc_type=self.type_assoc, body=assoc)
 
-        parts = []
-        for part in tag.split(self.delim):
-            parts.append(part)
+        # Start with creating the full tag and continue creating parent tags
+        # until one exists or until we hit root. This lets us save some
+        # round trips in the common case (the tag is already created).
+        parts = tag.split(self.delim)
+        while len(parts) > 0:
             tag = self.delim.join(parts)
             doc_tag = {
                 'tag': tag,
                 'parent': self.delim.join(parts[:-1]),
-                'name': part,
+                'name': parts[-1],
             }
-            self.conn.create(
-                index=self.index, doc_type=self.type_tag, id=tag, body=doc_tag)
+            try:
+                self.conn.create(index=self.index, doc_type=self.type_tag,
+                                 id=tag, body=doc_tag)
+            except ConflictError as e:
+                # Yay for brittle substring search for error detection!
+                if 'DocumentAlreadyExistsException' in e.error:
+                    break
+                raise
+            parts = parts[:-1]
 
     def list(self, parent_tag):
         parent_tag = self._normalize_tag(parent_tag)
