@@ -23,6 +23,7 @@ from __future__ import absolute_import, division, print_function
 
 import json
 import logging
+import urllib
 
 import bottle
 from elasticsearch import ConflictError, Elasticsearch, TransportError
@@ -143,7 +144,7 @@ def v1_url_associations(tags, url):
     in the ``v1_tag_associate`` route with one addition: a ``tag``
     field contains the full tag name for the association.
     '''
-    url = url.decode('utf-8').strip()
+    url = urllib.unquote_plus(url.decode('utf-8')).strip()
     return {'associations': tags.assocs_by_url(url)}
 
 

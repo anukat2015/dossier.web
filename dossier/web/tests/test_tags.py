@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 import json
 import time
+import urllib
 
 from dossier.web.tags import TagsSync
 import dossier.web.tags as tag_routes
@@ -11,7 +12,7 @@ import pytest
 
 NAMESPACE = 'dossier_web_tests'
 DUMMY_ASSOC = {
-    u'url': u'http://foo.com',
+    u'url': u'http://foo.com/abc/hello world/?foo=bar&baz=foo',
     u'text': u'Foo to the Bar to the Baz.',
     u'stream_id': u'123456789-somemd5hash',
     u'hash': u'nilsimsa-hash',
@@ -101,7 +102,11 @@ def test_tag_associations(tags):
 def test_url_associations(tags):
     req = new_request(body=json.dumps(DUMMY_ASSOC))
     tag_routes.v1_tag_associate(req, tags, 'foo/bar/baz')
-    assert tag_routes.v1_url_associations(tags, u'http://foo.com') == {
+    url = DUMMY_ASSOC[u'url']
+    assert tag_routes.v1_url_associations(tags, url) == {
+        'associations': [dict(DUMMY_ASSOC, **{u'tag': u'foo/bar/baz'})],
+    }
+    assert tag_routes.v1_url_associations(tags, urllib.quote(url)) == {
         'associations': [dict(DUMMY_ASSOC, **{u'tag': u'foo/bar/baz'})],
     }
 
