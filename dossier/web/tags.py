@@ -245,6 +245,8 @@ class Tags(object):
             },
         }
         hits = self.conn.suggest(index=self.index, body=body)
+        if 'tag' not in hits:
+            return []
         return map(lambda hit: hit['text'], hits['tag'][0]['options'])
 
     def assocs_by_tag(self, tag):
